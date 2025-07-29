@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RANCHERSPACE-GA - Resultados</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-success shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-home me-2"></i>
+                RANCHERSPACE-GA
+            </a>
+            <div class="navbar-nav flex-row">
+                <a class="nav-link me-3" href="/">
+                    <i class="fas fa-cog me-1"></i>
+                    Nueva Configuración
+                </a>
+                <span class="navbar-text">
+                    <i class="fas fa-chart-bar me-1"></i>
+                    Resultados y Visualización
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Header de Resultados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h1 class="card-title text-success">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Resultados de Optimización
+                        </h1>
+                        <p class="card-text text-muted" id="descripcionResultado">
+                            Visualización y análisis del rancho optimizado
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado de Carga -->
+        <div id="estadoCarga" class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="spinner-border text-success mb-3" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <h5>Cargando resultados...</h5>
+                        <p class="text-muted">Obteniendo los datos de la última optimización</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido Principal de Resultados -->
+        <div id="contenidoResultados" style="display: none;">
+
+            <!-- Resumen Ejecutivo -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">
+                                <i class="fas fa-trophy me-2"></i>
+                                Resumen Ejecutivo
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Fitness Alcanzado</h6>
+                                            <h3 class="text-success" id="fitnessAlcanzado">0.0000</h3>
+                                            <small class="text-muted">de 1.0000 máximo</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Generaciones</h6>
+                                            <h3 class="text-primary" id="generacionesEjecutadas">0</h3>
+                                            <small class="text-muted" id="tiempoTotal">0s</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Área Optimizada</h6>
+                                            <h3 class="text-warning" id="areaOptimizada">0</h3>
+                                            <small class="text-muted">metros cuadrados</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Costo Estimado</h6>
+                                            <h3 class="text-info" id="costoEstimado">$0</h3>
+                                            <small class="text-muted">pesos mexicanos</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Columna Izquierda: Visualización del Rancho -->
+                <div class="col-lg-8">
+
+                    <!-- Plano del Rancho -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-map me-2"></i>
+                                Plano del Rancho Optimizado
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="float-end">
+                                    <button class="btn btn-sm btn-outline-secondary" id="btnExportarPlano">
+                                        <i class="fas fa-download me-1"></i>Exportar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Canvas para el plano 2D -->
+                            <div class="border rounded p-2 bg-light">
+                                <canvas id="canvasRancho" width="700" height="500" class="border bg-white rounded"></canvas>
+                            </div>
+
+                            <!-- Leyenda -->
+                            <div class="mt-3">
+                                <h6>Leyenda:</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="color-box bg-warning me-2" style="width: 20px; height: 20px; border: 1px solid #000;"></div>
+                                            <span>Gallinas</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="color-box bg-danger me-2" style="width: 20px; height: 20px; border: 1px solid #000;"></div>
+                                            <span>Cerdos</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="color-box bg-primary me-2" style="width: 20px; height: 20px; border: 1px solid #000;"></div>
+                                            <span>Vacas</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="color-box bg-success me-2" style="width: 20px; height: 20px; border: 1px solid #000;"></div>
+                                            <span>Cabras</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráfico de Evolución -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Evolución del Fitness
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="graficoEvolucion" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Columna Derecha: Datos Técnicos -->
+                <div class="col-lg-4">
+
+                    <!-- Detalles de Corrales -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-home me-2"></i>
+                                Detalles de Corrales
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="detallesCorreales">
+                                <!-- Se llena dinámicamente -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Infraestructura -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-road me-2"></i>
+                                Infraestructura
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="detallesInfraestructura">
+                                <!-- Se llena dinámicamente -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Análisis Técnico Avanzado -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-dark text-white" data-bs-toggle="collapse" data-bs-target="#analisisTecnico" role="button">
+                            <h5 class="mb-0">
+                                <i class="fas fa-microscope me-2"></i>
+                                Análisis Técnico Avanzado
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </div>
+                        <div class="collapse" id="analisisTecnico">
+                            <div class="card-body">
+
+                                <!-- Métricas de Optimización -->
+                                <div class="mb-4">
+                                    <h6 class="border-bottom pb-2">Métricas de Optimización</h6>
+                                    <div id="metricas">
+                                        <!-- Se llena dinámicamente -->
+                                    </div>
+                                </div>
+
+                                <!-- Vector Genético -->
+                                <div class="mb-4">
+                                    <h6 class="border-bottom pb-2">Vector Genético</h6>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Vector de 52 números que representa la solución:</small>
+                                    </div>
+                                    <div class="bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;">
+                                        <code id="vectorGenetico" style="font-size: 0.8em; word-break: break-all;">
+                                            <!-- Se llena dinámicamente -->
+                                        </code>
+                                    </div>
+                                </div>
+
+                                <!-- Parámetros del Algoritmo -->
+                                <div class="mb-4">
+                                    <h6 class="border-bottom pb-2">Parámetros del Algoritmo</h6>
+                                    <div id="parametrosAlgoritmo">
+                                        <!-- Se llena dinámicamente -->
+                                    </div>
+                                </div>
+
+                                <!-- Estadísticas de Convergencia -->
+                                <div class="mb-4">
+                                    <h6 class="border-bottom pb-2">Estadísticas de Convergencia</h6>
+                                    <div id="estadisticasConvergencia">
+                                        <!-- Se llena dinámicamente -->
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Materiales -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-list me-2"></i>
+                                Lista de Materiales
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="listaMateriales">
+                                <!-- Se llena dinámicamente -->
+                            </div>
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="d-flex justify-content-between">
+                                    <strong>Total Estimado:</strong>
+                                    <strong id="costoTotalMateriales" class="text-success">$0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Recomendaciones y Instrucciones -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                Recomendaciones e Instrucciones de Construcción
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Recomendaciones Generales:</h6>
+                                    <ul id="recomendacionesGenerales">
+                                        <!-- Se llena dinámicamente -->
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Secuencia de Construcción:</h6>
+                                    <ol id="secuenciaConstruccion">
+                                        <!-- Se llena dinámicamente -->
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <button class="btn btn-success btn-lg me-3" id="btnExportarCompleto">
+                                <i class="fas fa-file-pdf me-2"></i>
+                                Exportar Reporte Completo
+                            </button>
+                            <button class="btn btn-primary btn-lg me-3" id="btnGuardarProyecto">
+                                <i class="fas fa-save me-2"></i>
+                                Guardar Proyecto
+                            </button>
+                            <button class="btn btn-outline-secondary btn-lg" onclick="location.href='/'">
+                                <i class="fas fa-plus me-2"></i>
+                                Nueva Optimización
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensaje de No Hay Resultados -->
+        <div id="sinResultados" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                            <h4>No hay resultados disponibles</h4>
+                            <p class="text-muted mb-4">
+                                No se encontraron resultados de optimización.
+                                Ejecute una nueva optimización para ver los resultados aquí.
+                            </p>
+                            <a href="/" class="btn btn-success btn-lg">
+                                <i class="fas fa-cog me-2"></i>
+                                Ir a Configuración
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/resultados.js') }}"></script>
+</body>
+</html>

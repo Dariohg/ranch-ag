@@ -1,0 +1,5 @@
+especie,nombre,area_minima_por_animal,distancia_minima_otras_especies,tipo_comedero,tipo_bebedero
+gallinas,Gallinas,0.5,3,tolva,automatico
+cerdos,Cerdos,2.5,5,concreto,chupon
+vacas,Vacas,15,8,comedero_largo,bebedero_grande
+cabras,Cabras,3,2,comedero_elevado,bebedero_medio

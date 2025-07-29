@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RANCHERSPACE-GA - Configuración</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-success shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-home me-2"></i>
+                RANCHERSPACE-GA
+            </a>
+            <span class="navbar-text">
+                <i class="fas fa-cog me-1"></i>
+                Configuración del Rancho
+            </span>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h1 class="card-title text-success">
+                            <i class="fas fa-seedling me-2"></i>
+                            Sistema de Optimización de Ranchos Mixtos
+                        </h1>
+                        <p class="card-text text-muted">
+                            Configure los parámetros de su rancho y ejecute la optimización con algoritmos genéticos
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de Configuración -->
+        <form id="configuracionForm">
+            <div class="row">
+                <!-- Columna Izquierda -->
+                <div class="col-md-6">
+
+                    <!-- Configuración del Terreno -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-map me-2"></i>
+                                Dimensiones del Terreno
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="anchoTerreno" class="form-label">Ancho (metros)</label>
+                                    <input type="number" class="form-control" id="anchoTerreno"
+                                           value="40" min="10" max="200" step="0.1" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="largoTerreno" class="form-label">Largo (metros)</label>
+                                    <input type="number" class="form-control" id="largoTerreno"
+                                           value="30" min="10" max="200" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="alert alert-info" id="infoTerreno">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Área total: <span id="areaTotalTerreno">1,200</span> m²
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configuración de Animales -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-paw me-2"></i>
+                                Cantidad de Animales
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% for especie in especies %}
+                            <div class="mb-3">
+                                <label for="animales_{{ especie }}" class="form-label">
+                                    {{ especies_info[especie].nombre }}
+                                    <small class="text-muted">({{ especies_info[especie].area_minima }} m²/animal)</small>
+                                </label>
+                                <input type="number" class="form-control animal-input"
+                                       id="animales_{{ especie }}"
+                                       data-especie="{{ especie }}"
+                                       value="{% if especie == 'gallinas' %}50{% elif especie == 'cerdos' %}8{% elif especie == 'vacas' %}3{% elif especie == 'cabras' %}15{% else %}0{% endif %}"
+                                       min="0" max="1000">
+                            </div>
+                            {% endfor %}
+
+                            <div class="alert alert-success" id="infoAnimales">
+                                <i class="fas fa-calculator me-2"></i>
+                                Área mínima requerida: <span id="areaMinimaTotalAnimales">0</span> m²
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configuración de Presupuesto -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-dollar-sign me-2"></i>
+                                Presupuesto
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <label for="presupuestoMaximo" class="form-label">Presupuesto máximo (pesos mexicanos)</label>
+                            <input type="number" class="form-control" id="presupuestoMaximo"
+                                   value="50000" min="1000" max="1000000" step="100" required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Incluye materiales de construcción y mano de obra
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Columna Derecha -->
+                <div class="col-md-6">
+
+                    <!-- Configuración de Materiales -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tools me-2"></i>
+                                Materiales por Especie
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% for especie in especies %}
+                            <div class="mb-3">
+                                <label for="material_{{ especie }}" class="form-label">
+                                    Material para {{ especies_info[especie].nombre }}
+                                </label>
+                                <select class="form-select" id="material_{{ especie }}" data-especie="{{ especie }}">
+                                    <option value="">Cargando materiales...</option>
+                                </select>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Prioridades de Optimización -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-balance-scale me-2"></i>
+                                Prioridades de Optimización
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="peso_espacio" class="form-label">
+                                    Bienestar Animal (espacio extra)
+                                    <span id="valor_peso_espacio" class="badge bg-primary">30%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_espacio"
+                                       min="0" max="100" value="30" data-objetivo="espacio_extra">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="peso_costo" class="form-label">
+                                    Minimizar Costos
+                                    <span id="valor_peso_costo" class="badge bg-primary">25%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_costo"
+                                       min="0" max="100" value="25" data-objetivo="costo_construccion">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="peso_materiales" class="form-label">
+                                    Minimizar Materiales
+                                    <span id="valor_peso_materiales" class="badge bg-primary">20%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_materiales"
+                                       min="0" max="100" value="20" data-objetivo="cantidad_materiales">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="peso_manejo" class="form-label">
+                                    Eficiencia de Manejo
+                                    <span id="valor_peso_manejo" class="badge bg-primary">15%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_manejo"
+                                       min="0" max="100" value="15" data-objetivo="eficiencia_manejo">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="peso_terreno" class="form-label">
+                                    Aprovechamiento del Terreno
+                                    <span id="valor_peso_terreno" class="badge bg-primary">10%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_terreno"
+                                       min="0" max="100" value="10" data-objetivo="aprovechamiento_terreno">
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Total: <span id="totalPesos">100%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configuración Avanzada del Algoritmo -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-dark text-white" data-bs-toggle="collapse" data-bs-target="#configAvanzada" role="button">
+                            <h5 class="mb-0">
+                                <i class="fas fa-cogs me-2"></i>
+                                Configuración Avanzada del Algoritmo
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </div>
+                        <div class="collapse" id="configAvanzada">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="tamañoPoblacion" class="form-label">Tamaño de Población</label>
+                                        <input type="number" class="form-control" id="tamañoPoblacion"
+                                               value="100" min="20" max="500" step="10">
+                                        <div class="form-text">Número de soluciones por generación</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="numeroGeneraciones" class="form-label">Generaciones</label>
+                                        <input type="number" class="form-control" id="numeroGeneraciones"
+                                               value="500" min="50" max="2000" step="50">
+                                        <div class="form-text">Iteraciones máximas del algoritmo</div>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <label for="probabilidadMutacion" class="form-label">Prob. Mutación</label>
+                                        <input type="number" class="form-control" id="probabilidadMutacion"
+                                               value="0.1" min="0.01" max="0.5" step="0.01">
+                                        <div class="form-text">Entre 0.01 y 0.5</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="tipoCruza" class="form-label">Tipo de Cruza</label>
+                                        <select class="form-select" id="tipoCruza">
+                                            <option value="uniforme" selected>Uniforme</option>
+                                            <option value="bloques">Por Bloques</option>
+                                            <option value="aritmetica">Aritmética</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Botón de Ejecución -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div id="validacionTerreno" class="mb-3"></div>
+
+                            <button type="submit" class="btn btn-success btn-lg" id="btnEjecutar">
+                                <i class="fas fa-play me-2"></i>
+                                Ejecutar Optimización
+                            </button>
+
+                            <button type="button" class="btn btn-info btn-lg ms-3" onclick="location.href='/resultados'">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Ver Últimos Resultados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Modal de Progreso -->
+    <div class="modal fade" id="modalProgreso" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-cog fa-spin me-2"></i>
+                        Ejecutando Optimización
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Progreso de Generaciones</label>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 id="progresoGeneraciones" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span id="generacionActual">Generación 0</span>
+                            <span id="tiempoTranscurrido">0s</span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6>Mejor Fitness</h6>
+                                    <h4 class="text-success" id="mejorFitness">0.0000</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6>Fitness Promedio</h6>
+                                    <h4 class="text-info" id="fitnessPromedio">0.0000</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="alert alert-info" id="mensajeProgreso">
+                            Iniciando optimización...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        La optimización puede tardar varios minutos dependiendo de los parámetros configurados.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/configuracion.js') }}"></script>
+</body>
+</html>

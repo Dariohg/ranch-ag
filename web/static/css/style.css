@@ -1,0 +1,323 @@
+/* Estilos personalizados para RANCHERSPACE-GA */
+
+:root {
+    --color-primary: #28a745;
+    --color-secondary: #6c757d;
+    --color-success: #28a745;
+    --color-info: #17a2b8;
+    --color-warning: #ffc107;
+    --color-danger: #dc3545;
+    --color-light: #f8f9fa;
+    --color-dark: #343a40;
+}
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Navbar personalizada */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Tarjetas con sombra suave */
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    border-bottom: none;
+    font-weight: 600;
+}
+
+/* Inputs y controles */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--color-success);
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.form-range:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Botones personalizados */
+.btn {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    padding: 0.6rem 1.2rem;
+}
+
+.btn-lg {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* Alertas personalizadas */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+/* Progress bars */
+.progress {
+    height: 1.2rem;
+    border-radius: 0.5rem;
+}
+
+.progress-bar {
+    border-radius: 0.5rem;
+}
+
+/* Canvas del plano */
+#canvasRancho {
+    cursor: crosshair;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Colores para especies */
+.color-gallinas { background-color: #ffc107; }
+.color-cerdos { background-color: #dc3545; }
+.color-vacas { background-color: #007bff; }
+.color-cabras { background-color: #28a745; }
+.color-pasillos { background-color: #6c757d; }
+
+/* Leyenda de colores */
+.color-box {
+    display: inline-block;
+    border-radius: 3px;
+}
+
+/* Modal personalizado */
+.modal-content {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-radius: 1rem 1rem 0 0;
+}
+
+/* Spinner personalizado */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Tarjetas de métricas */
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 0.5rem 0;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Animaciones suaves */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .btn-lg {
+        padding: 0.6rem 1.5rem;
+        font-size: 1rem;
+    }
+
+    #canvasRancho {
+        width: 100%;
+        height: 300px;
+    }
+}
+
+/* Tooltips personalizados */
+.tooltip-inner {
+    background-color: var(--color-dark);
+    color: white;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Badges personalizados */
+.badge {
+    border-radius: 0.5rem;
+    font-weight: 500;
+}
+
+/* Colapsos */
+.collapse {
+    transition: all 0.3s ease;
+}
+
+/* Tablas */
+.table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.table thead th {
+    border-bottom: 2px solid var(--color-success);
+    background-color: var(--color-light);
+}
+
+/* Lista de materiales */
+.material-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.material-item:last-child {
+    border-bottom: none;
+}
+
+.material-name {
+    font-weight: 500;
+}
+
+.material-quantity {
+    color: var(--color-secondary);
+    font-size: 0.9rem;
+}
+
+.material-cost {
+    font-weight: bold;
+    color: var(--color-success);
+}
+
+/* Vector genético */
+#vectorGenetico {
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+/* Gráficos */
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Estados de validación */
+.is-valid {
+    border-color: var(--color-success);
+}
+
+.is-invalid {
+    border-color: var(--color-danger);
+}
+
+.valid-feedback {
+    color: var(--color-success);
+}
+
+.invalid-feedback {
+    color: var(--color-danger);
+}
+
+/* Efectos hover */
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* Loader personalizado */
+.loader {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--color-success);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Iconos */
+.icon-lg {
+    font-size: 1.5rem;
+}
+
+.icon-xl {
+    font-size: 2rem;
+}
+
+/* Utilidades personalizadas */
+.text-gradient {
+    background: linear-gradient(45deg, var(--color-success), var(--color-info));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+}
+
+/* Sombras */
+.shadow-soft {
+    box-shadow: 0 2px 25px rgba(0,0,0,0.1);
+}
+
+.shadow-strong {
+    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+}

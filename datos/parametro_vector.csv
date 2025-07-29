@@ -1,0 +1,11 @@
+parametro,valor_minimo,valor_maximo,unidad,descripcion
+factor_agrandamiento,1.0,4.0,multiplicador,Factor de expansión del área mínima del corral
+proporcion,0.5,2.0,ratio,Relación ancho/alto del corral
+orientacion,0,360,grados,Orientación del corral en grados
+densidad,0.8,1.2,factor,Factor de densidad animal dentro del corral
+acceso,0,1,normalizado,Tipo de acceso al corral
+ventilacion,0,1,normalizado,Nivel de ventilación del corral
+ancho_pasillos,1.5,4.0,metros,Ancho de los pasillos principales
+configuracion,0,1,normalizado,Tipo de configuración de pasillos
+acceso_principal,0,1,normalizado,Posición del acceso principal al rancho
+conectividad,0,1,normalizado,Nivel de interconexión entre corrales
