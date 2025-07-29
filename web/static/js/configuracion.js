@@ -1,4 +1,4 @@
-// JavaScript para la página de configuración de RANCHERSPACE-GA
+// JavaScript para la página de configuración SIMPLIFICADA de RANCHERSPACE-GA
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeConfiguracion();
@@ -11,49 +11,11 @@ function initializeConfiguracion() {
     // Calcular valores iniciales
     calcularAreaTerreno();
     calcularAreaAnimales();
-    actualizarPesos();
+    actualizarPesosSimplificados(); // NUEVO: Solo 2 objetivos
     validarTerreno();
 
     // Cargar materiales por especie
     cargarMaterialesPorEspecie();
-}
-
-function cargarMaterialesPorEspecie() {
-    const especies = ['gallinas', 'cerdos', 'vacas', 'cabras'];
-
-    especies.forEach(especie => {
-        fetch(`/api/materiales/${especie}`)
-        .then(response => response.json())
-        .then(materiales => {
-            const select = document.getElementById(`material_${especie}`);
-            select.innerHTML = ''; // Limpiar opciones
-
-            // Agregar opciones de materiales compatibles
-            for (const [materialId, materialInfo] of Object.entries(materiales)) {
-                const option = document.createElement('option');
-                option.value = materialId;
-                option.textContent = `${materialInfo.nombre} ($${materialInfo.costo_por_metro}/m)`;
-
-                // Seleccionar el primer material por defecto
-                if (select.children.length === 0) {
-                    option.selected = true;
-                }
-
-                select.appendChild(option);
-            }
-
-            // Calcular costos después de cargar materiales
-            if (select.children.length > 0) {
-                calcularCostosEstimados();
-            }
-        })
-        .catch(error => {
-            console.error(`Error cargando materiales para ${especie}:`, error);
-            // Fallback
-            const select = document.getElementById(`material_${especie}`);
-            select.innerHTML = `<option value="material_${especie}">Material para ${especie} ($75/m)</option>`;
-        });
-    });
 }
 
 function setupEventListeners() {
@@ -66,7 +28,7 @@ function setupEventListeners() {
     inputsAnimales.forEach(input => {
         input.addEventListener('input', function() {
             calcularAreaAnimales();
-            calcularCostosEstimados();
+            calcularPresupuestoInteligente(); // NUEVO: Presupuesto inteligente
             validarTerreno();
         });
     });
@@ -75,20 +37,57 @@ function setupEventListeners() {
     const selectsMateriales = document.querySelectorAll('select[id^="material_"]');
     selectsMateriales.forEach(select => {
         select.addEventListener('change', function() {
-            calcularCostosEstimados();
+            calcularPresupuestoInteligente(); // NUEVO: Recalcular presupuesto
         });
     });
 
-    // Pesos de objetivos
-    const slidersPesos = document.querySelectorAll('input[type="range"][data-objetivo]');
-    slidersPesos.forEach(slider => {
-        slider.addEventListener('input', actualizarPesos);
+    // Presupuesto inteligente
+    document.getElementById('presupuestoMaximo').addEventListener('input', function() {
+        calcularPresupuestoInteligente();
     });
+
+    // Pesos simplificados (SOLO 2 OBJETIVOS)
+    document.getElementById('peso_terreno').addEventListener('input', actualizarPesosSimplificados);
+    document.getElementById('peso_manejo').addEventListener('input', actualizarPesosSimplificados);
 
     // Formulario principal
     document.getElementById('configuracionForm').addEventListener('submit', function(e) {
         e.preventDefault();
         ejecutarOptimizacion();
+    });
+}
+
+function cargarMaterialesPorEspecie() {
+    const especies = ['gallinas', 'cerdos', 'vacas', 'cabras'];
+
+    especies.forEach(especie => {
+        fetch(`/api/materiales/${especie}`)
+        .then(response => response.json())
+        .then(materiales => {
+            const select = document.getElementById(`material_${especie}`);
+            select.innerHTML = '';
+
+            for (const [materialId, materialInfo] of Object.entries(materiales)) {
+                const option = document.createElement('option');
+                option.value = materialId;
+                option.textContent = `${materialInfo.nombre} ($${materialInfo.costo_por_metro}/m)`;
+
+                if (select.children.length === 0) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            }
+
+            if (select.children.length > 0) {
+                calcularPresupuestoInteligente(); // NUEVO: Calcular presupuesto al cargar materiales
+            }
+        })
+        .catch(error => {
+            console.error(`Error cargando materiales para ${especie}:`, error);
+            const select = document.getElementById(`material_${especie}`);
+            select.innerHTML = `<option value="material_${especie}">Material para ${especie} ($75/m)</option>`;
+        });
     });
 }
 
@@ -99,6 +98,7 @@ function calcularAreaTerreno() {
 
     document.getElementById('areaTotalTerreno').textContent = areaTotal.toLocaleString('es-MX') + ' m²';
     validarTerreno();
+    calcularPresupuestoInteligente(); // NUEVO: Recalcular presupuesto si cambia terreno
 }
 
 function calcularAreaAnimales() {
@@ -109,7 +109,6 @@ function calcularAreaAnimales() {
         cabras: parseInt(document.getElementById('animales_cabras').value) || 0
     };
 
-    // Hacer petición al backend para calcular áreas
     fetch('/api/calcular_areas', {
         method: 'POST',
         headers: {
@@ -129,7 +128,8 @@ function calcularAreaAnimales() {
     });
 }
 
-function calcularCostosEstimados() {
+// NUEVA FUNCIÓN: Presupuesto Inteligente
+function calcularPresupuestoInteligente() {
     const animales = {
         gallinas: parseInt(document.getElementById('animales_gallinas').value) || 0,
         cerdos: parseInt(document.getElementById('animales_cerdos').value) || 0,
@@ -144,71 +144,68 @@ function calcularCostosEstimados() {
         cabras: document.getElementById('material_cabras').value
     };
 
+    const presupuestoUsuario = parseFloat(document.getElementById('presupuestoMaximo').value) || 50000;
+
     // Verificar que todos los materiales estén seleccionados
     const materialesCompletos = Object.values(materiales).every(material => material && material !== '');
+    const totalAnimales = Object.values(animales).reduce((a, b) => a + b, 0);
 
-    if (!materialesCompletos) {
-        return; // Esperar a que se carguen todos los materiales
+    if (!materialesCompletos || totalAnimales === 0) {
+        document.getElementById('resultadoPresupuestoInteligente').style.display = 'none';
+        return;
     }
 
-    // USAR BACKEND PARA CALCULAR COSTOS (todo en Python)
-    fetch('/api/calcular_costos_estimados', {
+    // Llamar al backend para calcular presupuesto inteligente
+    fetch('/api/calcular_presupuesto_inteligente', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
             animales: animales,
-            materiales: materiales
+            materiales: materiales,
+            presupuesto_usuario: presupuestoUsuario
         })
     })
     .then(response => response.json())
     .then(data => {
-        if (data.costo_total_estimado !== undefined) {
-            // Mostrar costo total estimado
-            mostrarCostoEstimado(data.costo_total_estimado, data.costos_por_especie);
-        }
+        mostrarResultadoPresupuestoInteligente(data);
     })
     .catch(error => {
-        console.error('Error calculando costos:', error);
+        console.error('Error calculando presupuesto inteligente:', error);
     });
 }
 
-function mostrarCostoEstimado(costoTotal, costosPorEspecie) {
-    // Buscar o crear elemento para mostrar costo
-    let elementoCosto = document.getElementById('costoEstimadoTotal');
+// NUEVA FUNCIÓN: Mostrar resultado del presupuesto inteligente
+function mostrarResultadoPresupuestoInteligente(data) {
+    const resultadoDiv = document.getElementById('resultadoPresupuestoInteligente');
+    const alertaDiv = document.getElementById('alertaPresupuesto');
 
-    if (!elementoCosto) {
-        // Crear elemento después del área mínima
-        const contenedorAnimales = document.getElementById('infoAnimales');
-        elementoCosto = document.createElement('div');
-        elementoCosto.id = 'costoEstimadoTotal';
-        elementoCosto.className = 'alert alert-info mt-2';
-        contenedorAnimales.parentNode.insertBefore(elementoCosto, contenedorAnimales.nextSibling);
+    // Mostrar valores
+    document.getElementById('costoEstimadoShow').textContent = '$' + data.costo_estimado.toLocaleString('es-MX');
+    document.getElementById('minimoRecomendadoShow').textContent = '$' + data.presupuesto_minimo_recomendado.toLocaleString('es-MX');
+
+    // Configurar mensaje y estilo según si es suficiente
+    const mensajeDiv = document.getElementById('mensajePresupuesto');
+
+    if (data.es_suficiente) {
+        alertaDiv.className = 'border rounded p-3 mt-3 border-success bg-light';
+        mensajeDiv.innerHTML = `
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <span class="text-success">Presupuesto suficiente</span><br>
+            <small>Presupuesto efectivo para el AG: $${data.presupuesto_efectivo.toLocaleString('es-MX')}</small>
+        `;
+    } else {
+        alertaDiv.className = 'border rounded p-3 mt-3 border-warning bg-warning bg-opacity-10';
+        mensajeDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            <span class="text-warning">Se recomienda aumentar presupuesto</span><br>
+            <small>Diferencia: $${data.diferencia.toLocaleString('es-MX')} adicionales</small><br>
+            <small class="text-muted">El AG usará $${data.presupuesto_efectivo.toLocaleString('es-MX')} como límite</small>
+        `;
     }
 
-    // Crear desglose de costos
-    let desglose = '';
-    for (const [especie, datos] of Object.entries(costosPorEspecie)) {
-        if (datos.cantidad_animales > 0) {
-            desglose += `<small class="d-block text-muted">
-                ${especie.charAt(0).toUpperCase() + especie.slice(1)}: 
-                ${datos.cantidad_animales} animales - 
-                ${datos.material_nombre} - 
-                $${datos.costo_total.toLocaleString('es-MX')}
-            </small>`;
-        }
-    }
-
-    elementoCosto.innerHTML = `
-        <i class="fas fa-calculator me-2"></i>
-        <strong>Costo estimado de materiales: $${costoTotal.toLocaleString('es-MX')}</strong>
-        <small class="d-block text-muted mt-1">
-            <i class="fas fa-info-circle me-1"></i>
-            Estimación inicial considerando imperfecciones prácticas. El AG optimizará la distribución.
-        </small>
-        ${desglose}
-    `;
+    resultadoDiv.style.display = 'block';
 }
 
 function validarTerreno() {
@@ -263,32 +260,31 @@ function validarTerreno() {
     });
 }
 
-function actualizarPesos() {
-    const pesos = {
-        espacio: parseInt(document.getElementById('peso_espacio').value),
-        costo: parseInt(document.getElementById('peso_costo').value),
-        materiales: parseInt(document.getElementById('peso_materiales').value),
-        manejo: parseInt(document.getElementById('peso_manejo').value),
-        terreno: parseInt(document.getElementById('peso_terreno').value)
-    };
+function actualizarPesosSimplificados() {
+    const pesoTerreno = parseInt(document.getElementById('peso_terreno').value);
+    const pesoManejo = parseInt(document.getElementById('peso_manejo').value);
 
-    // Actualizar labels con valores
-    document.getElementById('valor_peso_espacio').textContent = pesos.espacio + '%';
-    document.getElementById('valor_peso_costo').textContent = pesos.costo + '%';
-    document.getElementById('valor_peso_materiales').textContent = pesos.materiales + '%';
-    document.getElementById('valor_peso_manejo').textContent = pesos.manejo + '%';
-    document.getElementById('valor_peso_terreno').textContent = pesos.terreno + '%';
+    // Actualizar labels con valores actuales (SIN NORMALIZAR)
+    document.getElementById('valor_peso_terreno').textContent = pesoTerreno + '%';
+    document.getElementById('valor_peso_manejo').textContent = pesoManejo + '%';
 
-    // Calcular total
-    const total = pesos.espacio + pesos.costo + pesos.materiales + pesos.manejo + pesos.terreno;
-    const totalElement = document.getElementById('totalPesos');
+    // Calcular total para mostrar información
+    const total = pesoTerreno + pesoManejo;
+    document.getElementById('totalPesos').textContent = total + '%';
 
-    totalElement.textContent = total + '%';
-    totalElement.className = 'text-info fw-bold';
+    // QUITAR la validación restrictiva y cambiar el mensaje
+    const alertaDiv = document.querySelector('.alert-info');
+    if (alertaDiv) {
+        alertaDiv.innerHTML = `
+            <i class="fas fa-info-circle me-2"></i>
+            Total actual: <span id="totalPesos">${total}%</span>
+            <br><small>Los valores se normalizan automáticamente en el algoritmo (no es necesario que sumen 100%)</small>
+        `;
+    }
 }
 
 function recopilarConfiguracion() {
-    // Recopilar todos los datos del formulario
+    // Recopilar todos los datos del formulario (SIMPLIFICADO)
     const configuracion = {
         terreno: {
             ancho: parseFloat(document.getElementById('anchoTerreno').value),
@@ -307,12 +303,10 @@ function recopilarConfiguracion() {
             cabras: document.getElementById('material_cabras').value
         },
         presupuesto: parseFloat(document.getElementById('presupuestoMaximo').value),
+        // SOLO 2 OBJETIVOS
         objetivos: {
-            espacio_extra: parseInt(document.getElementById('peso_espacio').value) / 100,
-            costo_construccion: parseInt(document.getElementById('peso_costo').value) / 100,
-            cantidad_materiales: parseInt(document.getElementById('peso_materiales').value) / 100,
-            eficiencia_manejo: parseInt(document.getElementById('peso_manejo').value) / 100,
-            aprovechamiento_terreno: parseInt(document.getElementById('peso_terreno').value) / 100
+            aprovechamiento_terreno: parseInt(document.getElementById('peso_terreno').value) / 100,
+            eficiencia_manejo: parseInt(document.getElementById('peso_manejo').value) / 100
         },
         algoritmo: {
             poblacion: parseInt(document.getElementById('tamañoPoblacion').value),
@@ -393,6 +387,16 @@ function validarConfiguracion(config) {
         }
     }
 
+    // NUEVA VALIDACIÓN: Solo verificar que al menos un objetivo tenga valor > 0
+    const sumaObjetivos = config.objetivos.aprovechamiento_terreno + config.objetivos.eficiencia_manejo;
+    if (sumaObjetivos <= 0) {
+        alert('Al menos un objetivo debe tener un valor mayor que 0.');
+        return false;
+    }
+
+    // QUITAR COMPLETAMENTE la validación de que sume 100%
+    // El sistema normaliza automáticamente los pesos
+
     return true;
 }
 
@@ -402,7 +406,13 @@ function resetearProgreso() {
     document.getElementById('tiempoTranscurrido').textContent = '0s';
     document.getElementById('mejorFitness').textContent = '0.0000';
     document.getElementById('fitnessPromedio').textContent = '0.0000';
-    document.getElementById('mensajeProgreso').textContent = 'Iniciando optimización...';
+
+    // NUEVO: Resetear métricas de objetivos simplificados
+    document.getElementById('aprovechamientoTerreno').textContent = '0.0000';
+    document.getElementById('eficienciaManejo').textContent = '0.0000';
+    document.getElementById('statusPresupuesto').textContent = 'OK';
+
+    document.getElementById('mensajeProgreso').textContent = 'Iniciando optimización con sistema simplificado...';
 }
 
 function iniciarSeguimientoProgreso() {
@@ -435,6 +445,21 @@ function actualizarProgreso(data) {
     document.getElementById('tiempoTranscurrido').textContent = `${data.tiempo_transcurrido.toFixed(1)}s`;
     document.getElementById('mejorFitness').textContent = data.mejor_fitness.toFixed(4);
     document.getElementById('fitnessPromedio').textContent = data.fitness_promedio.toFixed(4);
+
+    // NUEVO: Actualizar métricas específicas si están disponibles
+    if (data.metricas_objetivos) {
+        document.getElementById('aprovechamientoTerreno').textContent =
+            (data.metricas_objetivos.aprovechamiento_terreno || 0).toFixed(4);
+        document.getElementById('eficienciaManejo').textContent =
+            (data.metricas_objetivos.eficiencia_manejo || 0).toFixed(4);
+    }
+
+    // Actualizar estado del presupuesto
+    if (data.dentro_presupuesto !== undefined) {
+        document.getElementById('statusPresupuesto').textContent = data.dentro_presupuesto ? 'OK' : 'EXCESO';
+        document.getElementById('statusPresupuesto').className = data.dentro_presupuesto ? 'text-success' : 'text-danger';
+    }
+
     document.getElementById('mensajeProgreso').textContent = data.mensaje;
 }
 
@@ -472,11 +497,17 @@ function animarElemento(elemento, clase = 'fade-in') {
     }, 500);
 }
 
-// Configuraciones predeterminadas
+// Configuraciones predeterminadas para sistema simplificado
 function aplicarConfiguracionRapida() {
     document.getElementById('tamañoPoblacion').value = 50;
     document.getElementById('numeroGeneraciones').value = 100;
     document.getElementById('probabilidadMutacion').value = 0.2;
+
+    // Configurar pesos para optimización rápida (más terreno)
+    document.getElementById('peso_terreno').value = 70;
+    document.getElementById('peso_manejo').value = 30;
+    actualizarPesosSimplificados();
+
     animarElemento(document.getElementById('configAvanzada'));
 }
 
@@ -484,6 +515,12 @@ function aplicarConfiguracionCompleta() {
     document.getElementById('tamañoPoblacion').value = 100;
     document.getElementById('numeroGeneraciones').value = 500;
     document.getElementById('probabilidadMutacion').value = 0.1;
+
+    // Configurar pesos balanceados
+    document.getElementById('peso_terreno').value = 60;
+    document.getElementById('peso_manejo').value = 40;
+    actualizarPesosSimplificados();
+
     animarElemento(document.getElementById('configAvanzada'));
 }
 

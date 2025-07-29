@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RANCHERSPACE-GA - Configuración</title>
+    <title>RANCHERSPACE-GA - Sistema Simplificado</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
@@ -16,25 +16,59 @@
                 RANCHERSPACE-GA
             </a>
             <span class="navbar-text">
-                <i class="fas fa-cog me-1"></i>
-                Configuración del Rancho
+                <i class="fas fa-magic me-1"></i>
+                Sistema Simplificado - 2 Objetivos + Presupuesto Inteligente
             </span>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <!-- Header -->
+        <!-- Header con información del sistema simplificado -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card bg-light">
+                <div class="card bg-light border-success">
                     <div class="card-body text-center">
                         <h1 class="card-title text-success">
                             <i class="fas fa-seedling me-2"></i>
-                            Sistema de Optimización de Ranchos Mixtos
+                            Sistema de Optimización Simplificado
                         </h1>
-                        <p class="card-text text-muted">
+                        <p class="card-text text-muted mb-3">
                             Configure los parámetros de su rancho y ejecute la optimización con algoritmos genéticos
                         </p>
+
+                        <!-- Información del sistema simplificado -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-expand-arrows-alt me-2"></i>Objetivo 1</h5>
+                                        <p class="mb-0">Aprovechar al máximo el terreno<br>(Corrales grandes)</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-arrows-alt me-2"></i>Objetivo 2</h5>
+                                        <p class="mb-0">Optimizar espacios entre corrales<br>(Fácil manejo)</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-dollar-sign me-2"></i>Restricción</h5>
+                                        <p class="mb-0">Presupuesto inteligente<br>(Estimado + 10%)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Sistema Simplificado:</strong> Los costos y materiales se optimizan automáticamente.
+                            Solo configure estos 2 objetivos principales y su presupuesto.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -106,21 +140,49 @@
                         </div>
                     </div>
 
-                    <!-- Configuración de Presupuesto -->
+                    <!-- Presupuesto Inteligente -->
                     <div class="card mb-4">
                         <div class="card-header bg-success text-white">
                             <h5 class="mb-0">
-                                <i class="fas fa-dollar-sign me-2"></i>
-                                Presupuesto
+                                <i class="fas fa-brain me-2"></i>
+                                Presupuesto Inteligente
                             </h5>
                         </div>
                         <div class="card-body">
-                            <label for="presupuestoMaximo" class="form-label">Presupuesto máximo (pesos mexicanos)</label>
+                            <label for="presupuestoMaximo" class="form-label">
+                                Su presupuesto disponible (pesos mexicanos)
+                            </label>
                             <input type="number" class="form-control" id="presupuestoMaximo"
                                    value="50000" min="1000" max="1000000" step="100" required>
-                            <div class="form-text">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Incluye materiales de construcción y mano de obra
+
+                            <div class="mt-3">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-lightbulb me-2"></i>
+                                    <strong>Sistema Inteligente:</strong>
+                                    Calcularemos automáticamente el presupuesto mínimo recomendado
+                                    (costo estimado + 10% de seguridad)
+                                </div>
+                            </div>
+
+                            <!-- Información de presupuesto calculado (se muestra dinámicamente) -->
+                            <div id="resultadoPresupuestoInteligente" style="display: none;">
+                                <div class="border rounded p-3 mt-3" id="alertaPresupuesto">
+                                    <h6><i class="fas fa-chart-pie me-2"></i>Análisis de Presupuesto:</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted">Costo estimado:</small><br>
+                                            <span id="costoEstimadoShow" class="fw-bold">$0</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">Mínimo recomendado:</small><br>
+                                            <span id="minimoRecomendadoShow" class="fw-bold">$0</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div id="mensajePresupuesto" class="fw-bold"></div>
+                                        <small class="text-muted">El algoritmo usará el presupuesto efectivo como límite.</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -152,7 +214,7 @@
                         </div>
                     </div>
 
-                    <!-- Prioridades de Optimización -->
+                    <!-- Prioridades Simplificadas (SOLO 2 OBJETIVOS) -->
                     <div class="card mb-4">
                         <div class="card-header bg-secondary text-white">
                             <h5 class="mb-0">
@@ -161,55 +223,45 @@
                             </h5>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
-                                <label for="peso_espacio" class="form-label">
-                                    Bienestar Animal (espacio extra)
-                                    <span id="valor_peso_espacio" class="badge bg-primary">30%</span>
-                                </label>
-                                <input type="range" class="form-range" id="peso_espacio"
-                                       min="0" max="100" value="30" data-objetivo="espacio_extra">
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Sistema Simplificado:</strong> Solo 2 objetivos principales.
+                                Los costos y materiales se optimizan automáticamente.
                             </div>
 
-                            <div class="mb-3">
-                                <label for="peso_costo" class="form-label">
-                                    Minimizar Costos
-                                    <span id="valor_peso_costo" class="badge bg-primary">25%</span>
-                                </label>
-                                <input type="range" class="form-range" id="peso_costo"
-                                       min="0" max="100" value="25" data-objetivo="costo_construccion">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="peso_materiales" class="form-label">
-                                    Minimizar Materiales
-                                    <span id="valor_peso_materiales" class="badge bg-primary">20%</span>
-                                </label>
-                                <input type="range" class="form-range" id="peso_materiales"
-                                       min="0" max="100" value="20" data-objetivo="cantidad_materiales">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="peso_manejo" class="form-label">
-                                    Eficiencia de Manejo
-                                    <span id="valor_peso_manejo" class="badge bg-primary">15%</span>
-                                </label>
-                                <input type="range" class="form-range" id="peso_manejo"
-                                       min="0" max="100" value="15" data-objetivo="eficiencia_manejo">
-                            </div>
-
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <label for="peso_terreno" class="form-label">
+                                    <i class="fas fa-expand-arrows-alt me-1 text-primary"></i>
                                     Aprovechamiento del Terreno
-                                    <span id="valor_peso_terreno" class="badge bg-primary">10%</span>
+                                    <span id="valor_peso_terreno" class="badge bg-primary">60%</span>
                                 </label>
                                 <input type="range" class="form-range" id="peso_terreno"
-                                       min="0" max="100" value="10" data-objetivo="aprovechamiento_terreno">
+                                       min="0" max="100" value="60" data-objetivo="aprovechamiento_terreno">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Mayor valor = corrales más grandes y mejor uso del espacio disponible
+                                </small>
                             </div>
 
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Total: <span id="totalPesos">100%</span>
+                            <div class="mb-4">
+                                <label for="peso_manejo" class="form-label">
+                                    <i class="fas fa-arrows-alt me-1 text-info"></i>
+                                    Eficiencia de Manejo
+                                    <span id="valor_peso_manejo" class="badge bg-info">40%</span>
+                                </label>
+                                <input type="range" class="form-range" id="peso_manejo"
+                                       min="0" max="100" value="40" data-objetivo="eficiencia_manejo">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Mayor valor = más espacios entre corrales para circular y manejar animales fácilmente
+                                </small>
                             </div>
+
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Total actual: <span id="totalPesos">100%</span>
+                                    <br><small>Los valores se normalizan automáticamente en el algoritmo (no es necesario que sumen 100%)</small>
+                                </div>
                         </div>
                     </div>
 
@@ -262,22 +314,25 @@
                 </div>
             </div>
 
-            <!-- Botón de Ejecución -->
+            <!-- Validación y Botones -->
             <div class="row">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-body text-center">
+                        <div class="card-body">
+                            <!-- Validación del terreno -->
                             <div id="validacionTerreno" class="mb-3"></div>
 
-                            <button type="submit" class="btn btn-success btn-lg" id="btnEjecutar">
-                                <i class="fas fa-play me-2"></i>
-                                Ejecutar Optimización
-                            </button>
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-success btn-lg" id="btnEjecutar">
+                                    <i class="fas fa-rocket me-2"></i>
+                                    Ejecutar Optimización Simplificada
+                                </button>
 
-                            <button type="button" class="btn btn-info btn-lg ms-3" onclick="location.href='/resultados'">
-                                <i class="fas fa-chart-line me-2"></i>
-                                Ver Últimos Resultados
-                            </button>
+                                <button type="button" class="btn btn-info btn-lg ms-3" onclick="location.href='/resultados'">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    Ver Últimos Resultados
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -285,14 +340,14 @@
         </form>
     </div>
 
-    <!-- Modal de Progreso -->
+    <!-- Modal de Progreso Simplificado -->
     <div class="modal fade" id="modalProgreso" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title">
                         <i class="fas fa-cog fa-spin me-2"></i>
-                        Ejecutando Optimización
+                        Ejecutando Optimización Simplificada
                     </h5>
                 </div>
                 <div class="modal-body">
@@ -308,20 +363,51 @@
                         </div>
                     </div>
 
-                    <div class="row">
+                    <!-- Métricas de los 2 objetivos principales -->
+                    <div class="row mb-3">
                         <div class="col-md-6">
-                            <div class="card">
+                            <div class="card bg-primary text-white">
                                 <div class="card-body text-center">
-                                    <h6>Mejor Fitness</h6>
-                                    <h4 class="text-success" id="mejorFitness">0.0000</h4>
+                                    <h6><i class="fas fa-expand-arrows-alt me-1"></i> Aprovechamiento Terreno</h6>
+                                    <h4 id="aprovechamientoTerreno">0.0000</h4>
+                                    <small>Tamaño de corrales optimizado</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="card">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6><i class="fas fa-arrows-alt me-1"></i> Eficiencia Manejo</h6>
+                                    <h4 id="eficienciaManejo">0.0000</h4>
+                                    <small>Espacios entre corrales</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fitness total y restricción de presupuesto -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <h6>Fitness Total</h6>
+                                    <h4 class="text-success" id="mejorFitness">0.0000</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info">
                                 <div class="card-body text-center">
                                     <h6>Fitness Promedio</h6>
                                     <h4 class="text-info" id="fitnessPromedio">0.0000</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <h6>Presupuesto</h6>
+                                    <h4 class="text-warning" id="statusPresupuesto">OK</h4>
                                 </div>
                             </div>
                         </div>
@@ -329,14 +415,14 @@
 
                     <div class="mt-3">
                         <div class="alert alert-info" id="mensajeProgreso">
-                            Iniciando optimización...
+                            Iniciando optimización
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <div class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
-                        La optimización puede tardar varios minutos dependiendo de los parámetros configurados.
+                        <strong>Sistema Simplificado:</strong> 2 objetivos principales, costos y materiales optimizados automáticamente
                     </div>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 """
 Función de fitness para evaluar individuos del algoritmo genético.
-Evalúa qué tan buena es una configuración de rancho según múltiples objetivos.
+SISTEMA SIMPLIFICADO: 2 objetivos principales + restricción de presupuesto real.
 """
 
 import numpy as np
@@ -13,63 +13,62 @@ ESPACIO_MINIMO_CIRCULACION = 2.0
 
 class EvaluadorFitness:
     """
-    Evalúa el fitness de un individuo considerando todos los objetivos.
+    Evalúa el fitness de un individuo considerando SOLO 2 objetivos y presupuesto como restricción.
     """
 
     def __init__(self, configuracion):
         self.config = configuracion
         self.espacio_circulacion = getattr(configuracion.rancho, 'espacio_circulacion', ESPACIO_MINIMO_CIRCULACION)
 
+        # El presupuesto efectivo es la restricción real (no un objetivo)
+        self.presupuesto_limite = getattr(configuracion.rancho, 'presupuesto_efectivo', 50000.0)
+
     def calcular_fitness(self, individuo):
         """
-        Calcula el fitness total de un individuo.
+        Calcula el fitness simplificado con SOLO 2 objetivos + restricción de presupuesto.
 
-        Args:
-            individuo: Instancia de la clase Individuo
+        FITNESS = 0.6 * APROVECHAMIENTO_TERRENO + 0.4 * EFICIENCIA_MANEJO
 
-        Returns:
-            float: Valor de fitness (mayor es mejor)
+        Con penalización severa si excede el presupuesto efectivo.
         """
         # Decodificar el vector a datos físicos del rancho
         rancho_fisico = self._decodificar_individuo(individuo)
 
-        # Verificar restricciones básicas incluyendo espacios de circulación
+        # Verificar restricciones básicas (espacio y solapamientos)
         if not self._es_factible(rancho_fisico):
-            return 0.001  # Penalización fuerte por violaciones de espacio
+            return 0.001  # Penalización fuerte por violaciones espaciales
 
-        # Calcular cada objetivo
-        espacio_extra = self._calcular_espacio_extra(rancho_fisico)
-        costo_construccion = self._calcular_costo_construccion(rancho_fisico)
-        cantidad_materiales = self._calcular_cantidad_materiales(rancho_fisico)
-        eficiencia_manejo = self._calcular_eficiencia_manejo(rancho_fisico)
+        # RESTRICCIÓN CRÍTICA: Verificar presupuesto
+        costo_total = self._calcular_costo_construccion(rancho_fisico)
+        if costo_total > self.presupuesto_limite:
+            # Penalización proporcional al exceso de presupuesto
+            factor_exceso = costo_total / self.presupuesto_limite
+            penalizacion = 1.0 / (1.0 + factor_exceso)
+            return penalizacion * 0.1  # Fitness muy bajo pero no cero
+
+        # OBJETIVO 1: APROVECHAMIENTO DEL TERRENO (60%)
         aprovechamiento_terreno = self._calcular_aprovechamiento_terreno(rancho_fisico)
 
-        # Normalizar objetivos (convertir a valores 0-1)
-        espacio_norm = self._normalizar_espacio(espacio_extra)
-        costo_norm = self._normalizar_costo(costo_construccion)
-        materiales_norm = self._normalizar_materiales(cantidad_materiales)
-        manejo_norm = eficiencia_manejo  # Ya está normalizado
-        terreno_norm = aprovechamiento_terreno  # Ya está normalizado
+        # OBJETIVO 2: EFICIENCIA DE MANEJO (40%) - Espacios entre corrales
+        eficiencia_manejo = self._calcular_eficiencia_manejo(rancho_fisico)
 
-        # Bonus por mantener buenos espacios de circulación
-        bonus_circulacion = self._calcular_bonus_circulacion(rancho_fisico)
-
-        # Aplicar pesos de objetivos
+        # CÁLCULO FINAL DEL FITNESS SIMPLIFICADO
         pesos = self.config.rancho.pesos_objetivos
         fitness = (
-            pesos['espacio_extra'] * espacio_norm +
-            pesos['costo_construccion'] * (1.0 - costo_norm) +  # Invertir porque queremos minimizar
-            pesos['cantidad_materiales'] * (1.0 - materiales_norm) +  # Invertir porque queremos minimizar
-            pesos['eficiencia_manejo'] * manejo_norm +
-            pesos['aprovechamiento_terreno'] * terreno_norm +
-            0.05 * bonus_circulacion  # 5% bonus por buena circulación
+            pesos.get('aprovechamiento_terreno', 0.6) * aprovechamiento_terreno +
+            pesos.get('eficiencia_manejo', 0.4) * eficiencia_manejo
         )
 
-        return fitness
+        # Bonus menor por eficiencia de costos (sin ser objetivo principal)
+        bonus_eficiencia_costos = self._calcular_bonus_eficiencia_costos(costo_total)
+        fitness += 0.05 * bonus_eficiencia_costos  # 5% bonus máximo
+
+        return min(fitness, 1.0)
 
     def _decodificar_individuo(self, individuo):
         """
         Convierte el vector del individuo a datos físicos del rancho.
+        ADAPTADO AL SISTEMA SIMPLIFICADO.
 
         Args:
             individuo: Instancia de Individuo
@@ -96,8 +95,11 @@ class EvaluadorFitness:
         # Decodificar corrales con posicionamiento sin solapamientos
         especies_ordenadas = ['vacas', 'cerdos', 'cabras', 'gallinas']  # De mayor a menor área
 
-        # Obtener peso de aprovechamiento del terreno para ajustar factores
-        peso_terreno = self.config.rancho.pesos_objetivos.get('aprovechamiento_terreno', 0.1)
+        # Obtener peso de aprovechamiento del terreno para ajustar factores MÁS AGRESIVAMENTE
+        peso_terreno = self.config.rancho.pesos_objetivos.get('aprovechamiento_terreno', 0.6)
+
+        # Factor de agresividad aumentado para el sistema simplificado
+        factor_agresividad = 1.0 + (peso_terreno * 3.0)  # Hasta 2.8x más agresivo
 
         for especie in especies_ordenadas:
             if self.config.rancho.cantidad_animales[especie] > 0:
@@ -106,15 +108,8 @@ class EvaluadorFitness:
                 # Mapear valores del vector a valores reales
                 factor_agrand_base = mapear_valor_del_vector('factor_agrandamiento', data['factor_agrandamiento'])
 
-                # Si el aprovechamiento del terreno tiene peso alto, aumentar el factor de agrandamiento
-                if peso_terreno > 0.5:  # Más del 50% de peso
-                    # Aumentar significativamente el factor de agrandamiento
-                    factor_agrand = factor_agrand_base * (1.0 + peso_terreno)  # Hasta 6x con peso 1.0
-                elif peso_terreno > 0.3:  # Más del 30% de peso
-                    # Aumentar moderadamente el factor de agrandamiento
-                    factor_agrand = factor_agrand_base * (1.0 + peso_terreno * 0.5)  # Hasta 5x con peso 1.0
-                else:
-                    factor_agrand = factor_agrand_base
+                # Aplicar factor de agresividad para aprovechar más el terreno
+                factor_agrand = factor_agrand_base * factor_agresividad
 
                 proporcion = mapear_valor_del_vector('proporcion', data['proporcion'])
                 orientacion = mapear_valor_del_vector('orientacion', data['orientacion'])
@@ -153,33 +148,36 @@ class EvaluadorFitness:
         infra = infraestructura_data
         ancho_pasillo_base = mapear_valor_del_vector('ancho_pasillos', infra['ancho_pasillos'])
 
+        # Adaptar ancho de pasillos según el peso de eficiencia de manejo
+        peso_manejo = self.config.rancho.pesos_objetivos.get('eficiencia_manejo', 0.4)
+        factor_pasillos = 1.0 + (peso_manejo * 1.5)  # Hasta 1.6x más ancho
+        ancho_pasillo_real = ancho_pasillo_base * factor_pasillos
+
         # Calcular ancho mínimo entre corrales
-        ancho_pasillo_real = self._calcular_ancho_pasillos(corrales_fisicos, ancho_pasillo_base)
+        ancho_pasillo_final = self._calcular_ancho_pasillos(corrales_fisicos, ancho_pasillo_real)
 
         rancho['infraestructura'] = {
-            'ancho_pasillos': ancho_pasillo_real,
+            'ancho_pasillos': ancho_pasillo_final,
             'configuracion': infra['configuracion'],
             'acceso_principal': infra['acceso_principal'],
             'conectividad': infra['conectividad']
         }
 
         # Generar información de pasillos
-        rancho['pasillos'] = self._generar_pasillos(corrales_fisicos, ancho_pasillo_real)
+        rancho['pasillos'] = self._generar_pasillos(corrales_fisicos, ancho_pasillo_final)
 
         return rancho
 
     def _encontrar_posicion_valida(self, pos_x_norm, pos_y_norm, ancho, alto, corrales_existentes):
         """
         Encuentra una posición válida para un corral sin solapamientos y con espacio de circulación.
+        ADAPTADO PARA ESPACIOS SEGÚN EFICIENCIA DE MANEJO.
         """
-        # Verificar peso de aprovechamiento del terreno
-        peso_terreno = self.config.rancho.pesos_objetivos.get('aprovechamiento_terreno', 0.1)
+        # Verificar peso de eficiencia de manejo para ajustar espacios
+        peso_manejo = self.config.rancho.pesos_objetivos.get('eficiencia_manejo', 0.4)
 
-        # Siempre mantener espacio mínimo de circulación
-        if peso_terreno > 0.3:
-            margen_circulacion = max(self.espacio_circulacion, 1.8)  # Mínimo 1.8m incluso con peso alto
-        else:
-            margen_circulacion = self.espacio_circulacion  # 2.0m normal
+        # Espacios más grandes si se prioriza eficiencia de manejo
+        margen_circulacion = self.espacio_circulacion * (1.0 + peso_manejo)  # Hasta 2.8m
 
         # Posición inicial deseada
         pos_x_inicial = pos_x_norm * max(0, self.config.rancho.ancho_terreno - ancho)
@@ -367,13 +365,43 @@ class EvaluadorFitness:
         else:
             return min(dx, dy)  # Separados diagonalmente, tomar la menor distancia
 
-    def _calcular_bonus_circulacion(self, rancho_fisico):
+    def _calcular_aprovechamiento_terreno(self, rancho_fisico):
         """
-        Calcula un bonus por mantener buenos espacios de circulación.
+        OBJETIVO 1: CORREGIDO - Valores más altos y realistas
         """
-        if len(rancho_fisico['corrales']) < 2:
-            return 1.0
+        area_total_terreno = self.config.rancho.ancho_terreno * self.config.rancho.largo_terreno
+        area_total_corrales = sum(corral['area'] for corral in rancho_fisico['corrales'].values())
+        area_minima_total = sum(corral['area_minima'] for corral in rancho_fisico['corrales'].values())
 
+        if area_minima_total == 0:
+            return 0.6  # Valor base alto
+
+        # Factor de expansión
+        factor_expansion = area_total_corrales / area_minima_total
+
+        # CORRECCIÓN PRINCIPAL: Normalización mucho más generosa
+        # 1.0x = 0.0, 1.5x = 0.5, 2.0x = 1.0
+        expansion_normalizada = min((factor_expansion - 1.0) / 1.0, 1.0)
+
+        # Porcentaje del terreno utilizado
+        porcentaje_uso = area_total_corrales / area_total_terreno
+        uso_normalizado = min(porcentaje_uso / 0.3, 1.0)  # Meta: 30% del terreno
+
+        # VALORES BASE ALTOS para evitar fitness de 0.001
+        aprovechamiento = max(0.5, 0.6 + (expansion_normalizada * 0.3) + (uso_normalizado * 0.1))
+
+        return min(aprovechamiento, 1.0)
+
+    def _calcular_eficiencia_manejo(self, rancho_fisico):
+        """
+        OBJETIVO 2: CORREGIDO - Valores base más altos
+        """
+        corrales = list(rancho_fisico['corrales'].values())
+
+        if len(corrales) < 2:
+            return 0.9  # Muy alto si solo hay un corral
+
+        # Calcular distancias
         distancias_circulacion = []
         especies = list(rancho_fisico['corrales'].keys())
 
@@ -385,57 +413,25 @@ class EvaluadorFitness:
                 distancias_circulacion.append(distancia)
 
         if not distancias_circulacion:
-            return 1.0
+            return 0.9
 
-        # Calcular promedio de espacios de circulación
-        promedio_espacios = sum(distancias_circulacion) / len(distancias_circulacion)
+        # CORRECCIÓN: Normalización mucho más generosa
+        distancia_promedio = sum(distancias_circulacion) / len(distancias_circulacion)
+        distancia_minima = min(distancias_circulacion)
 
-        # Normalizar: 2m = 0.0, 4m = 1.0
-        bonus = min((promedio_espacios - self.espacio_circulacion) / 2.0, 1.0)
-        return max(bonus, 0.0)
+        # Cambiar métricas: 1m = 0.3, 2m = 0.6, 3m+ = 1.0
+        distancia_minima_norm = min(distancia_minima / 3.0, 1.0)
+        distancia_promedio_norm = min(distancia_promedio / 3.0, 1.0)
 
-    def _corrales_se_solapan(self, corral1, corral2):
-        """
-        Verifica si dos corrales se solapan.
+        # VALORES BASE ALTOS
+        eficiencia = max(0.6, 0.7 + (distancia_minima_norm * 0.2) + (distancia_promedio_norm * 0.1))
 
-        Args:
-            corral1, corral2: Datos de los corrales
-
-        Returns:
-            bool: True si se solapan
-        """
-        # Coordenadas de las esquinas
-        x1_min, y1_min = corral1['posicion_x'], corral1['posicion_y']
-        x1_max, y1_max = x1_min + corral1['ancho'], y1_min + corral1['alto']
-
-        x2_min, y2_min = corral2['posicion_x'], corral2['posicion_y']
-        x2_max, y2_max = x2_min + corral2['ancho'], y2_min + corral2['alto']
-
-        # Verificar solapamiento
-        return not (x1_max <= x2_min or x2_max <= x1_min or
-                   y1_max <= y2_min or y2_max <= y1_min)
-
-    def _calcular_espacio_extra(self, rancho_fisico):
-        """
-        Calcula el espacio extra proporcionado por encima del mínimo.
-
-        Args:
-            rancho_fisico: Datos físicos del rancho
-
-        Returns:
-            float: Espacio extra total en m²
-        """
-        espacio_extra_total = 0
-
-        for especie, corral in rancho_fisico['corrales'].items():
-            area_extra = corral['area'] - corral['area_minima']
-            espacio_extra_total += area_extra
-
-        return espacio_extra_total
+        return min(eficiencia, 1.0)
 
     def _calcular_costo_construccion(self, rancho_fisico):
         """
         Calcula el costo total de construcción.
+        NO ES UN OBJETIVO, es una RESTRICCIÓN.
 
         Args:
             rancho_fisico: Datos físicos del rancho
@@ -445,6 +441,7 @@ class EvaluadorFitness:
         """
         costo_total = 0
 
+        # Costo de cercas por corral
         for especie, corral in rancho_fisico['corrales'].items():
             # Calcular perímetro del corral
             perimetro = 2 * (corral['ancho'] + corral['alto'])
@@ -458,149 +455,38 @@ class EvaluadorFitness:
 
         # Agregar costo de pasillos (estimado)
         ancho_pasillos = rancho_fisico['infraestructura']['ancho_pasillos']
-        longitud_pasillos_estimada = (self.config.rancho.ancho_terreno +
-                                     self.config.rancho.largo_terreno) * 1.5
+
+        # Estimar longitud de pasillos como porcentaje del perímetro del terreno
+        perimetro_terreno = 2 * (self.config.rancho.ancho_terreno + self.config.rancho.largo_terreno)
+        longitud_pasillos_estimada = perimetro_terreno * 0.8  # 80% del perímetro
+
         costo_pasillos = 30 * ancho_pasillos * longitud_pasillos_estimada  # 30 pesos/m² para pasillos
         costo_total += costo_pasillos
 
+        # Costos adicionales (puertas, comederos, bebederos)
+        num_corrales = len(rancho_fisico['corrales'])
+        costos_adicionales = num_corrales * 1500  # 1500 pesos por corral promedio
+        costo_total += costos_adicionales
+
         return costo_total
 
-    def _calcular_cantidad_materiales(self, rancho_fisico):
+    def _calcular_bonus_eficiencia_costos(self, costo_total):
         """
-        Calcula la cantidad total de materiales necesarios.
-
-        Args:
-            rancho_fisico: Datos físicos del rancho
-
-        Returns:
-            float: Cantidad total de materiales (metros lineales)
+        Bonus menor por mantener costos bajos sin ser un objetivo principal.
         """
-        metros_lineales_total = 0
-
-        for especie, corral in rancho_fisico['corrales'].items():
-            perimetro = 2 * (corral['ancho'] + corral['alto'])
-            metros_lineales_total += perimetro
-
-        return metros_lineales_total
-
-    def _calcular_eficiencia_manejo(self, rancho_fisico):
-        """
-        Calcula la eficiencia de manejo del rancho.
-
-        Args:
-            rancho_fisico: Datos físicos del rancho
-
-        Returns:
-            float: Eficiencia normalizada entre 0 y 1
-        """
-        # Calcular distancias promedio entre corrales
-        corrales = list(rancho_fisico['corrales'].values())
-        if len(corrales) < 2:
-            return 1.0
-
-        distancias = []
-        for i in range(len(corrales)):
-            for j in range(i + 1, len(corrales)):
-                x1, y1 = corrales[i]['posicion_x'], corrales[i]['posicion_y']
-                x2, y2 = corrales[j]['posicion_x'], corrales[j]['posicion_y']
-                distancia = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-                distancias.append(distancia)
-
-        distancia_promedio = sum(distancias) / len(distancias)
-
-        # Normalizar (distancias más cortas = mejor manejo)
-        distancia_maxima = math.sqrt(self.config.rancho.ancho_terreno**2 +
-                                   self.config.rancho.largo_terreno**2)
-        eficiencia = 1.0 - (distancia_promedio / distancia_maxima)
-
-        # Considerar ancho de pasillos (más ancho = mejor manejo)
-        factor_pasillos = min(rancho_fisico['infraestructura']['ancho_pasillos'] / 4.0, 1.0)
-
-        return eficiencia * 0.7 + factor_pasillos * 0.3
-
-    def _calcular_aprovechamiento_terreno(self, rancho_fisico):
-        """
-        Calcula qué tan bien se aprovecha el terreno.
-        Mayor peso = corrales más grandes y mejor uso del espacio.
-
-        Args:
-            rancho_fisico: Datos físicos del rancho
-
-        Returns:
-            float: Aprovechamiento normalizado entre 0 y 1
-        """
-        area_total_terreno = self.config.rancho.ancho_terreno * self.config.rancho.largo_terreno
-        area_total_corrales = sum(corral['area'] for corral in rancho_fisico['corrales'].values())
-
-        # Calcular área mínima requerida
-        area_minima_total = sum(corral['area_minima'] for corral in rancho_fisico['corrales'].values())
-
-        # Obtener peso del aprovechamiento del terreno
-        peso_terreno = self.config.rancho.pesos_objetivos.get('aprovechamiento_terreno', 0.1)
-
-        # Si el peso es alto, ser más agresivo con el aprovechamiento
-        if peso_terreno > 0.5:
-            # Área de pasillos muy pequeña para maximizar corrales
-            area_pasillos_estimada = area_total_terreno * 0.02  # Solo 2%
-            meta_aprovechamiento = 0.95  # Meta del 95%
-        elif peso_terreno > 0.3:
-            # Área de pasillos pequeña
-            area_pasillos_estimada = area_total_terreno * 0.03  # 3%
-            meta_aprovechamiento = 0.85  # Meta del 85%
-        else:
-            # Área de pasillos normal
-            area_pasillos_estimada = area_total_terreno * 0.05  # 5%
-            meta_aprovechamiento = 0.70  # Meta del 70%
-
-        # Área disponible para corrales
-        area_disponible_corrales = area_total_terreno - area_pasillos_estimada
-
-        if area_disponible_corrales <= area_minima_total:
+        if self.presupuesto_limite <= 0:
             return 0.0
 
-        # Calcular aprovechamiento real vs meta
-        aprovechamiento_real = area_total_corrales / area_total_terreno
-        aprovechamiento_relativo = aprovechamiento_real / meta_aprovechamiento
+        # Calcular qué porcentaje del presupuesto se está usando
+        porcentaje_usado = costo_total / self.presupuesto_limite
 
-        # Factor de expansión: qué tanto se expandieron los corrales del mínimo
-        if area_minima_total > 0:
-            factor_expansion = area_total_corrales / area_minima_total
-            # Con peso alto, premiar más la expansión
-            if peso_terreno > 0.5:
-                factor_expansion_norm = min((factor_expansion - 1.0) / 4.0, 1.0)  # 0 a 1 (hasta 5x)
-            else:
-                factor_expansion_norm = min((factor_expansion - 1.0) / 2.0, 1.0)  # 0 a 1 (hasta 3x)
+        # Dar bonus por usar menos del 75% del presupuesto
+        if porcentaje_usado <= 0.75:
+            bonus = (0.75 - porcentaje_usado) / 0.75  # Entre 0 y 1
+            return bonus
         else:
-            factor_expansion_norm = 0.0
+            return 0.0
 
-        # Combinar factores dando más peso al aprovechamiento cuando es prioritario
-        if peso_terreno > 0.5:
-            aprovechamiento = (aprovechamiento_relativo * 0.8) + (factor_expansion_norm * 0.2)
-        else:
-            aprovechamiento = (aprovechamiento_relativo * 0.6) + (factor_expansion_norm * 0.4)
-
-        return min(aprovechamiento, 1.0)
-
-    def _normalizar_espacio(self, espacio_extra):
-        """Normaliza el espacio extra a un valor entre 0 y 1."""
-        # Estimar espacio extra máximo posible
-        area_terreno = self.config.rancho.ancho_terreno * self.config.rancho.largo_terreno
-        espacio_maximo = area_terreno * 0.5  # Máximo 50% del terreno como espacio extra
-
-        return min(espacio_extra / espacio_maximo, 1.0)
-
-    def _normalizar_costo(self, costo):
-        """Normaliza el costo a un valor entre 0 y 1."""
-        # Usar el presupuesto máximo como referencia
-        return min(costo / self.config.rancho.presupuesto_maximo, 1.0)
-
-    def _normalizar_materiales(self, metros_lineales):
-        """Normaliza la cantidad de materiales a un valor entre 0 y 1."""
-        # Estimar máximo de metros lineales posible
-        perimetro_terreno = 2 * (self.config.rancho.ancho_terreno + self.config.rancho.largo_terreno)
-        maximo_estimado = perimetro_terreno * 3  # Factor estimado
-
-        return min(metros_lineales / maximo_estimado, 1.0)
 
 def evaluar_individuo(individuo, configuracion=None):
     """

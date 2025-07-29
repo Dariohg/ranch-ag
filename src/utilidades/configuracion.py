@@ -1,6 +1,7 @@
 """
 Configuración del sistema RANCHERSPACE-GA.
 Maneja tanto los datos configurables por el usuario como los parámetros del AG.
+SISTEMA SIMPLIFICADO - 2 OBJETIVOS + PRESUPUESTO INTELIGENTE
 """
 
 class ConfiguracionRancho:
@@ -34,17 +35,54 @@ class ConfiguracionRancho:
             'cabras': 'cerca_alambre_reforzada'
         }
 
-        # PRESUPUESTO - Configurable por usuario
-        self.presupuesto_maximo = 50000.0  # pesos mexicanos
+        # PRESUPUESTO INTELIGENTE - NUEVO SISTEMA
+        self.presupuesto_usuario = 50000.0  # Lo que ingresa el usuario
+        self.presupuesto_minimo_calculado = 0.0  # Se calcula automáticamente (estimado + 10%)
+        self.presupuesto_efectivo = 0.0  # El que realmente se usa en el AG
+        self.factor_seguridad_presupuesto = 1.10  # 10% adicional sobre el estimado
 
-        # PRIORIDADES DE OPTIMIZACIÓN - Configurable por usuario
+        # PRIORIDADES SIMPLIFICADAS - SOLO 2 OBJETIVOS
         self.pesos_objetivos = {
-            'espacio_extra': 0.3,      # Maximizar espacio por corral
-            'costo_construccion': 0.25, # Minimizar costos
-            'cantidad_materiales': 0.2, # Minimizar materiales
-            'eficiencia_manejo': 0.15,  # Maximizar eficiencia
-            'aprovechamiento_terreno': 0.1  # Optimizar terreno
+            'aprovechamiento_terreno': 0.6,  # 60% - Maximizar tamaño de corrales
+            'eficiencia_manejo': 0.4,        # 40% - Maximizar espacios entre corrales
         }
+
+    def calcular_presupuesto_inteligente(self, costo_estimado):
+        """
+        Calcula el presupuesto efectivo basado en el estimado y lo ingresado por el usuario.
+
+        Args:
+            costo_estimado: Costo estimado inicial de la construcción
+
+        Returns:
+            dict: Información completa del presupuesto
+        """
+        # Calcular presupuesto mínimo recomendado (estimado + 10%)
+        self.presupuesto_minimo_calculado = costo_estimado * self.factor_seguridad_presupuesto
+
+        # El presupuesto efectivo es el mayor entre el mínimo calculado y lo que ingresó el usuario
+        self.presupuesto_efectivo = max(self.presupuesto_minimo_calculado, self.presupuesto_usuario)
+
+        return {
+            'presupuesto_usuario': self.presupuesto_usuario,
+            'costo_estimado': costo_estimado,
+            'presupuesto_minimo_recomendado': self.presupuesto_minimo_calculado,
+            'presupuesto_efectivo': self.presupuesto_efectivo,
+            'es_suficiente': self.presupuesto_usuario >= self.presupuesto_minimo_calculado,
+            'diferencia': self.presupuesto_efectivo - self.presupuesto_usuario,
+            'mensaje_recomendacion': self._generar_mensaje_presupuesto()
+        }
+
+    def _generar_mensaje_presupuesto(self):
+        """
+        Genera mensaje de recomendación sobre el presupuesto.
+        """
+        if self.presupuesto_usuario >= self.presupuesto_minimo_calculado:
+            return f"✓ Presupuesto suficiente. Límite efectivo: ${self.presupuesto_efectivo:,.0f}"
+        else:
+            diferencia = self.presupuesto_minimo_calculado - self.presupuesto_usuario
+            return (f"⚠️ Se recomienda aumentar el presupuesto en ${diferencia:,.0f} "
+                   f"(mínimo recomendado: ${self.presupuesto_minimo_calculado:,.0f})")
 
 class ConfiguracionAlgoritmoGenetico:
     """
@@ -112,25 +150,32 @@ class ConfiguracionSistema:
             for especie, material in datos_web['materiales'].items():
                 self.rancho.material_por_especie[especie] = material
 
-        # Actualizar presupuesto
+        # Actualizar presupuesto del usuario
         if 'presupuesto' in datos_web:
-            self.rancho.presupuesto_maximo = float(datos_web['presupuesto'])
+            self.rancho.presupuesto_usuario = float(datos_web['presupuesto'])
 
-        # Actualizar pesos de objetivos
+        # ACTUALIZAR PESOS DE OBJETIVOS - SOLO 2 OBJETIVOS
         if 'objetivos' in datos_web:
-            # Normalizar los pesos automáticamente
             pesos_raw = datos_web['objetivos']
-            suma_pesos = sum(pesos_raw.values())
 
+            # Solo procesar los objetivos que existen en el sistema simplificado
+            objetivos_validos = {}
+            if 'aprovechamiento_terreno' in pesos_raw:
+                objetivos_validos['aprovechamiento_terreno'] = pesos_raw['aprovechamiento_terreno']
+            if 'eficiencia_manejo' in pesos_raw:
+                objetivos_validos['eficiencia_manejo'] = pesos_raw['eficiencia_manejo']
+
+            # Normalizar los pesos para que sumen 1.0
+            suma_pesos = sum(objetivos_validos.values())
             if suma_pesos > 0:
-                # Normalizar para que sumen 1.0
-                for objetivo, peso in pesos_raw.items():
+                for objetivo, peso in objetivos_validos.items():
                     self.rancho.pesos_objetivos[objetivo] = peso / suma_pesos
             else:
-                # Si todos son 0, usar pesos iguales
-                peso_igual = 1.0 / len(self.rancho.pesos_objetivos)
-                for objetivo in self.rancho.pesos_objetivos:
-                    self.rancho.pesos_objetivos[objetivo] = peso_igual
+                # Si todos son 0, usar pesos por defecto
+                self.rancho.pesos_objetivos = {
+                    'aprovechamiento_terreno': 0.6,
+                    'eficiencia_manejo': 0.4
+                }
 
         # Actualizar parámetros del AG
         if 'algoritmo' in datos_web:
@@ -138,6 +183,18 @@ class ConfiguracionSistema:
             self.algoritmo_genetico.tamano_poblacion = int(ag_datos.get('poblacion', 100))
             self.algoritmo_genetico.numero_generaciones = int(ag_datos.get('generaciones', 500))
             self.algoritmo_genetico.probabilidad_mutacion = float(ag_datos.get('mutacion', 0.1))
+
+    def calcular_y_ajustar_presupuesto(self, costo_estimado):
+        """
+        Calcula el presupuesto inteligente y ajusta la configuración.
+
+        Args:
+            costo_estimado: Costo estimado inicial
+
+        Returns:
+            dict: Información del presupuesto calculado
+        """
+        return self.rancho.calcular_presupuesto_inteligente(costo_estimado)
 
     def obtener_info_material(self, especie):
         """
@@ -171,10 +228,7 @@ class ConfiguracionSistema:
 
     def validar_configuracion(self):
         """
-        Valida que la configuración sea coherente.
-
-        Returns:
-            tuple: (es_valida, lista_errores)
+        Valida que la configuración sea coherente con el sistema simplificado.
         """
         errores = []
 
@@ -185,32 +239,29 @@ class ConfiguracionSistema:
         # Validar espacios de circulación
         if self.rancho.espacio_circulacion < 1.0:
             errores.append("El espacio de circulación debe ser de al menos 1.0 metro")
-        elif self.rancho.espacio_circulacion > 5.0:
-            errores.append("El espacio de circulación no debería exceder 5.0 metros")
 
         # Validar animales
-        for especie, cantidad in self.rancho.cantidad_animales.items():
-            if cantidad < 0:
-                errores.append(f"La cantidad de {especie} no puede ser negativa")
-
-        # Validar que haya al menos un animal
         total_animales = sum(self.rancho.cantidad_animales.values())
         if total_animales == 0:
             errores.append("Debe haber al menos un animal configurado")
 
-        # Validar presupuesto
-        if self.rancho.presupuesto_maximo <= 0:
+        # Validar presupuesto del usuario
+        if self.rancho.presupuesto_usuario <= 0:
             errores.append("El presupuesto debe ser positivo")
 
-        # Validar pesos de objetivos (solo que sean positivos)
-        for objetivo, peso in self.rancho.pesos_objetivos.items():
-            if peso < 0:
-                errores.append(f"El peso de {objetivo} no puede ser negativo")
-
-        # Validar que al menos un peso sea mayor que 0
+        # NUEVA VALIDACIÓN: Solo verificar que al menos un peso sea > 0
         suma_pesos = sum(self.rancho.pesos_objetivos.values())
         if suma_pesos <= 0:
             errores.append("Al menos un objetivo debe tener peso mayor que 0")
+
+        # QUITAR COMPLETAMENTE la validación de que sume 1.0 (100%)
+        # El sistema normaliza automáticamente en actualizar_desde_web()
+
+        # Verificar que solo existan los 2 objetivos permitidos
+        objetivos_permitidos = {'aprovechamiento_terreno', 'eficiencia_manejo'}
+        objetivos_actuales = set(self.rancho.pesos_objetivos.keys())
+        if not objetivos_actuales.issubset(objetivos_permitidos):
+            errores.append("Solo se permiten los objetivos: aprovechamiento_terreno y eficiencia_manejo")
 
         # Validar parámetros del AG
         if self.algoritmo_genetico.tamano_poblacion < 10:
@@ -225,10 +276,10 @@ class ConfiguracionSistema:
 
             # Área mínima para animales
             area_minima_animales = (
-                self.rancho.cantidad_animales.get('gallinas', 0) * 0.5 +
-                self.rancho.cantidad_animales.get('cerdos', 0) * 2.5 +
-                self.rancho.cantidad_animales.get('vacas', 0) * 15 +
-                self.rancho.cantidad_animales.get('cabras', 0) * 3
+                    self.rancho.cantidad_animales.get('gallinas', 0) * 0.5 +
+                    self.rancho.cantidad_animales.get('cerdos', 0) * 2.5 +
+                    self.rancho.cantidad_animales.get('vacas', 0) * 15 +
+                    self.rancho.cantidad_animales.get('cabras', 0) * 3
             )
 
             # Agregar estimación de espacios de circulación (40% adicional con espacios)
@@ -236,8 +287,8 @@ class ConfiguracionSistema:
 
             if area_con_circulacion > area_terreno * 0.85:
                 errores.append(f"El terreno es muy pequeño considerando los espacios de circulación requeridos. "
-                             f"Se necesitan aproximadamente {area_con_circulacion:.0f} m² "
-                             f"pero solo hay {area_terreno:.0f} m² disponibles.")
+                               f"Se necesitan aproximadamente {area_con_circulacion:.0f} m² "
+                               f"pero solo hay {area_terreno:.0f} m² disponibles.")
 
         return len(errores) == 0, errores
 
@@ -259,8 +310,12 @@ class ConfiguracionSistema:
                 },
                 'animales': self.rancho.cantidad_animales,
                 'materiales': self.rancho.material_por_especie,
-                'presupuesto': self.rancho.presupuesto_maximo,
-                'objetivos': self.rancho.pesos_objetivos
+                'presupuesto': {
+                    'usuario': self.rancho.presupuesto_usuario,
+                    'minimo_calculado': self.rancho.presupuesto_minimo_calculado,
+                    'efectivo': self.rancho.presupuesto_efectivo
+                },
+                'objetivos': self.rancho.pesos_objetivos  # Solo 2 objetivos
             },
             'algoritmo': {
                 'poblacion': self.algoritmo_genetico.tamano_poblacion,

@@ -198,37 +198,27 @@ class Poblacion:
 
     def _verificar_criterios_parada(self, estadisticas, mejor_anterior, sin_mejora):
         """
-        Verifica si se debe parar el algoritmo.
-
-        Args:
-            estadisticas: Estadísticas actuales
-            mejor_anterior: Mejor fitness anterior
-            sin_mejora: Generaciones sin mejora
-
-        Returns:
-            bool: True si se debe parar
+        CORREGIDO: Criterios menos estrictos
         """
         config_ag = self.config.algoritmo_genetico
 
-        # Criterio 1: Convergencia (sin mejora por muchas generaciones)
-        if sin_mejora >= config_ag.convergencia_generaciones:
+        # CORRECCIÓN PRINCIPAL: Permitir más generaciones
+        if sin_mejora >= 200:  # Era 50, ahora 200
             print(f"Parada por convergencia: {sin_mejora} generaciones sin mejora")
             return True
 
-        # Criterio 2: Fitness objetivo alcanzado
+        # Fitness objetivo más realista
         if (config_ag.fitness_objetivo is not None and
                 estadisticas['mejor'] >= config_ag.fitness_objetivo):
-            print(f"Parada por fitness objetivo alcanzado: {estadisticas['mejor']:.4f}")
             return True
 
-        # Criterio 3: Tiempo máximo
+        # Tiempo máximo más generoso
         if (config_ag.tiempo_maximo is not None and
                 time.time() - self.tiempo_inicio >= config_ag.tiempo_maximo):
-            print(f"Parada por tiempo máximo alcanzado")
             return True
 
-        # Criterio 4: Diversidad muy baja (población convergió)
-        if estadisticas['desviacion'] < 0.001:
+        # CORRECCIÓN CRÍTICA: Diversidad mucho más baja
+        if estadisticas['desviacion'] < 0.00001:  # Era 0.001, ahora mucho menor
             print("Parada por baja diversidad en la población")
             return True
 

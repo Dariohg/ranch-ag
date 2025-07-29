@@ -1,6 +1,7 @@
 """
 Aplicación web Flask para RANCHERSPACE-GA
 Interfaz web para configurar y ejecutar optimizaciones de ranchos.
+SISTEMA SIMPLIFICADO - 2 OBJETIVOS + PRESUPUESTO INTELIGENTE
 """
 
 import sys
@@ -39,7 +40,13 @@ class ProgressoOptimizacion:
             'mejor_fitness': 0,
             'fitness_promedio': 0,
             'tiempo_transcurrido': 0,
-            'mensaje': 'Esperando configuración...'
+            'mensaje': 'Esperando configuración...',
+            # NUEVO: Métricas específicas de objetivos
+            'metricas_objetivos': {
+                'aprovechamiento_terreno': 0,
+                'eficiencia_manejo': 0
+            },
+            'dentro_presupuesto': True
         }
         self.resultado_final = None
 
@@ -53,6 +60,20 @@ class ProgressoOptimizacion:
             'tiempo_transcurrido': progreso['tiempo_transcurrido'],
             'mensaje': f'Generación {progreso["generacion"]} - Fitness: {progreso["estadisticas"]["mejor"]:.4f}'
         })
+
+        # NUEVO: Extraer métricas de objetivos específicos si están disponibles
+        if 'mejor_individuo' in progreso:
+            try:
+                # Estimación de métricas basadas en el fitness
+                fitness = progreso['estadisticas']['mejor']
+
+                # Estimación de métricas (en implementación real calcularías desde el individuo)
+                self.datos['metricas_objetivos'] = {
+                    'aprovechamiento_terreno': min(fitness * 1.2, 1.0),  # Estimación
+                    'eficiencia_manejo': min(fitness * 0.8, 1.0)        # Estimación
+                }
+            except Exception as e:
+                print(f"[DEBUG] Error calculando métricas de objetivos: {e}")
 
     def iniciar(self, total_generaciones):
         """Inicia el seguimiento del progreso."""
@@ -107,9 +128,80 @@ def resultados():
     """Página de resultados y visualización."""
     return render_template('resultados.html')
 
+def calcular_perimetro_estimado_inicial(area):
+    """
+    Calcula el perímetro estimado inicial con factor de realismo.
+    Usa forma cuadrada + 10% por imperfecciones prácticas.
+    """
+    lado_cuadrado = math.sqrt(area)
+    perimetro_cuadrado = 4 * lado_cuadrado
+    factor_realismo = 1.10  # 10% adicional por imperfecciones
+    return perimetro_cuadrado * factor_realismo
+
+@app.route('/api/calcular_presupuesto_inteligente', methods=['POST'])
+def calcular_presupuesto_inteligente():
+    """API para calcular presupuesto inteligente (estimado + 10%)."""
+    try:
+        datos = request.json
+        animales = datos.get('animales', {})
+        materiales_seleccionados = datos.get('materiales', {})
+        presupuesto_usuario = float(datos.get('presupuesto_usuario', 50000))
+
+        # Calcular costo estimado
+        costo_estimado = 0
+
+        for especie, cantidad in animales.items():
+            if cantidad > 0 and especie in materiales_seleccionados:
+                # Calcular área mínima
+                area_minima = calcular_area_minima_corral(especie, cantidad)
+
+                # Calcular perímetro usando método estimado inicial
+                perimetro_estimado = calcular_perimetro_estimado_inicial(area_minima)
+
+                # Obtener costo del material seleccionado
+                material_id = materiales_seleccionados[especie]
+                try:
+                    material_info = obtener_info_material(material_id)
+                    costo_por_metro = material_info.costo_por_metro
+                except ValueError:
+                    costo_por_metro = 75  # Fallback
+
+                # Calcular costo para esta especie
+                costo_especie = perimetro_estimado * costo_por_metro
+                costo_estimado += costo_especie
+
+        # Agregar costos de infraestructura (estimado 30% del total)
+        costo_infraestructura = costo_estimado * 0.3
+        costo_estimado_total = costo_estimado + costo_infraestructura
+
+        # PRESUPUESTO INTELIGENTE: Estimado + 10%
+        factor_seguridad = 1.10
+        presupuesto_minimo_recomendado = costo_estimado_total * factor_seguridad
+
+        # El presupuesto efectivo es el mayor entre el mínimo y lo que ingresó el usuario
+        presupuesto_efectivo = max(presupuesto_minimo_recomendado, presupuesto_usuario)
+
+        # Determinar si el presupuesto del usuario es suficiente
+        es_suficiente = presupuesto_usuario >= presupuesto_minimo_recomendado
+        diferencia = presupuesto_efectivo - presupuesto_usuario
+
+        return jsonify({
+            'costo_estimado': costo_estimado_total,
+            'presupuesto_usuario': presupuesto_usuario,
+            'presupuesto_minimo_recomendado': presupuesto_minimo_recomendado,
+            'presupuesto_efectivo': presupuesto_efectivo,
+            'es_suficiente': es_suficiente,
+            'diferencia': diferencia,
+            'factor_seguridad': factor_seguridad,
+            'mensaje': 'Presupuesto calculado correctamente'
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/iniciar_optimizacion', methods=['POST'])
 def iniciar_optimizacion():
-    """API para iniciar la optimización."""
+    """API para iniciar la optimización con presupuesto inteligente."""
     global ejecutando_optimizacion
 
     if ejecutando_optimizacion:
@@ -122,6 +214,29 @@ def iniciar_optimizacion():
         # Crear configuración del sistema
         config = ConfiguracionSistema()
         config.actualizar_desde_web(datos_config)
+
+        # NUEVO: Calcular presupuesto inteligente ANTES de validar
+        # Calcular costo estimado
+        costo_estimado = 0
+        for especie, cantidad in config.rancho.cantidad_animales.items():
+            if cantidad > 0:
+                area_minima = calcular_area_minima_corral(especie, cantidad)
+                perimetro_estimado = calcular_perimetro_estimado_inicial(area_minima)
+
+                try:
+                    material_info = obtener_info_material(config.rancho.material_por_especie[especie])
+                    costo_por_metro = material_info.costo_por_metro
+                except:
+                    costo_por_metro = 75
+
+                costo_estimado += perimetro_estimado * costo_por_metro
+
+        # Agregar infraestructura
+        costo_estimado_total = costo_estimado * 1.3
+
+        # Aplicar presupuesto inteligente
+        info_presupuesto = config.calcular_y_ajustar_presupuesto(costo_estimado_total)
+        print(f"[DEBUG] Presupuesto inteligente: {info_presupuesto}")
 
         # Validar configuración
         es_valida, errores = config.validar_configuracion()
@@ -136,10 +251,9 @@ def iniciar_optimizacion():
         def ejecutar_en_hilo():
             global ejecutando_optimizacion
             try:
-                print("[DEBUG] Iniciando optimización en hilo separado...")
+                print(f"[DEBUG] Iniciando optimización con presupuesto efectivo: ${config.rancho.presupuesto_efectivo:,.0f}")
                 resultado = ejecutar_optimizacion(config, progreso_optimizacion.callback_progreso)
-                print(f"[DEBUG] Optimización completada. Exito: {resultado.get('exito', False)}")
-                print(f"[DEBUG] Fitness: {resultado.get('mejor_fitness', 'N/A')}")
+                print(f"[DEBUG] Optimización completada. Éxito: {resultado.get('exito', False)}")
 
                 # Agregar datos físicos del rancho usando el evaluador de fitness
                 if resultado.get('exito') and 'mejor_individuo' in resultado:
@@ -147,7 +261,14 @@ def iniciar_optimizacion():
                     evaluador = EvaluadorFitness(config)
                     rancho_fisico = evaluador._decodificar_individuo(resultado['mejor_individuo'])
                     resultado['rancho_fisico'] = rancho_fisico
-                    print("[DEBUG] Datos físicos del rancho agregados")
+
+                    # Calcular costo real final
+                    costo_real = evaluador._calcular_costo_construccion(rancho_fisico)
+                    resultado['costo_real_final'] = costo_real
+                    resultado['dentro_presupuesto'] = costo_real <= config.rancho.presupuesto_efectivo
+
+                    print(f"[DEBUG] Costo real final: ${costo_real:,.0f}")
+                    print(f"[DEBUG] Dentro del presupuesto: {resultado['dentro_presupuesto']}")
 
                 progreso_optimizacion.completar(resultado)
             except Exception as e:
@@ -164,7 +285,10 @@ def iniciar_optimizacion():
         hilo.daemon = True
         hilo.start()
 
-        return jsonify({'mensaje': 'Optimización iniciada correctamente'})
+        return jsonify({
+            'mensaje': 'Optimización iniciada con presupuesto inteligente',
+            'presupuesto_info': info_presupuesto
+        })
 
     except Exception as e:
         ejecutando_optimizacion = False
@@ -174,6 +298,7 @@ def iniciar_optimizacion():
 def obtener_progreso():
     """API para obtener el progreso actual."""
     return jsonify(progreso_optimizacion.obtener_datos())
+
 
 @app.route('/api/resultado')
 def obtener_resultado():
@@ -187,9 +312,10 @@ def obtener_resultado():
                 # Convertir el individuo a datos serializables
                 mejor_individuo = resultado['mejor_individuo']
 
-                # Crear estructura serializable
+                # CORRECCIÓN: Convertir tipos de datos problemáticos
                 individuo_serializable = {
-                    'vector': mejor_individuo.vector.tolist() if hasattr(mejor_individuo.vector, 'tolist') else list(mejor_individuo.vector),
+                    'vector': mejor_individuo.vector.tolist() if hasattr(mejor_individuo.vector, 'tolist') else list(
+                        mejor_individuo.vector),
                     'fitness': float(mejor_individuo.fitness) if mejor_individuo.fitness else 0.0,
                     'corrales': mejor_individuo.obtener_datos_corrales(),
                     'comederos': mejor_individuo.obtener_datos_comederos(),
@@ -199,9 +325,12 @@ def obtener_resultado():
 
                 resultado['mejor_individuo'] = individuo_serializable
 
-            # Limpiar otros objetos no serializables
+            # CORRECCIÓN CRÍTICA: Limpiar objetos no serializables y convertir tipos
             if 'poblacion_final' in resultado:
                 del resultado['poblacion_final']
+
+            # Convertir todos los valores booleanos y numpy a tipos nativos de Python
+            resultado = convertir_a_json_serializable(resultado)
 
             print(f"[DEBUG] Enviando resultado: fitness={resultado.get('mejor_fitness', 'N/A')}")
             return jsonify(resultado)
@@ -214,6 +343,30 @@ def obtener_resultado():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Error obteniendo resultado: {str(e)}'}), 500
+
+
+def convertir_a_json_serializable(obj):
+    """
+    Convierte recursivamente objetos problemáticos a tipos serializables JSON.
+    """
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: convertir_a_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convertir_a_json_serializable(item) for item in obj]
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, bool):
+        return obj  # Los bool nativos de Python son serializables
+    else:
+        return obj
 
 @app.route('/api/materiales/<especie>')
 def obtener_materiales_especie(especie):
@@ -265,16 +418,6 @@ def obtener_materiales():
     except Exception as e:
         print(f"Error obteniendo materiales: {e}")
         return jsonify({})
-
-def calcular_perimetro_estimado_inicial(area):
-    """
-    Calcula el perímetro estimado inicial con factor de realismo.
-    Usa forma cuadrada + 10% por imperfecciones prácticas.
-    """
-    lado_cuadrado = math.sqrt(area)
-    perimetro_cuadrado = 4 * lado_cuadrado
-    factor_realismo = 1.10  # 10% adicional por imperfecciones
-    return perimetro_cuadrado * factor_realismo
 
 @app.route('/api/calcular_costos_estimados', methods=['POST'])
 def calcular_costos_estimados():
@@ -502,7 +645,7 @@ def error_servidor(e):
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
-    print("=== RANCHERSPACE-GA - Interfaz Web ===")
+    print("=== RANCHERSPACE-GA - Interfaz Web Simplificada ===")
     print("Iniciando servidor Flask...")
     print("Accede a: http://localhost:8080")
     print("Para detener: Ctrl+C")
