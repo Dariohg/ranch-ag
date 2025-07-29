@@ -32,7 +32,7 @@ function cargarMaterialesPorEspecie() {
             for (const [materialId, materialInfo] of Object.entries(materiales)) {
                 const option = document.createElement('option');
                 option.value = materialId;
-                option.textContent = `${materialInfo.nombre} (${materialInfo.costo_por_metro}/m)`;
+                option.textContent = `${materialInfo.nombre} ($${materialInfo.costo_por_metro}/m)`;
 
                 // Seleccionar el primer material por defecto
                 if (select.children.length === 0) {
@@ -40,6 +40,11 @@ function cargarMaterialesPorEspecie() {
                 }
 
                 select.appendChild(option);
+            }
+
+            // Calcular costos después de cargar materiales
+            if (select.children.length > 0) {
+                calcularCostosEstimados();
             }
         })
         .catch(error => {
@@ -61,7 +66,16 @@ function setupEventListeners() {
     inputsAnimales.forEach(input => {
         input.addEventListener('input', function() {
             calcularAreaAnimales();
+            calcularCostosEstimados();
             validarTerreno();
+        });
+    });
+
+    // Materiales
+    const selectsMateriales = document.querySelectorAll('select[id^="material_"]');
+    selectsMateriales.forEach(select => {
+        select.addEventListener('change', function() {
+            calcularCostosEstimados();
         });
     });
 
@@ -113,6 +127,88 @@ function calcularAreaAnimales() {
     .catch(error => {
         console.error('Error calculando áreas:', error);
     });
+}
+
+function calcularCostosEstimados() {
+    const animales = {
+        gallinas: parseInt(document.getElementById('animales_gallinas').value) || 0,
+        cerdos: parseInt(document.getElementById('animales_cerdos').value) || 0,
+        vacas: parseInt(document.getElementById('animales_vacas').value) || 0,
+        cabras: parseInt(document.getElementById('animales_cabras').value) || 0
+    };
+
+    const materiales = {
+        gallinas: document.getElementById('material_gallinas').value,
+        cerdos: document.getElementById('material_cerdos').value,
+        vacas: document.getElementById('material_vacas').value,
+        cabras: document.getElementById('material_cabras').value
+    };
+
+    // Verificar que todos los materiales estén seleccionados
+    const materialesCompletos = Object.values(materiales).every(material => material && material !== '');
+
+    if (!materialesCompletos) {
+        return; // Esperar a que se carguen todos los materiales
+    }
+
+    // USAR BACKEND PARA CALCULAR COSTOS (todo en Python)
+    fetch('/api/calcular_costos_estimados', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            animales: animales,
+            materiales: materiales
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.costo_total_estimado !== undefined) {
+            // Mostrar costo total estimado
+            mostrarCostoEstimado(data.costo_total_estimado, data.costos_por_especie);
+        }
+    })
+    .catch(error => {
+        console.error('Error calculando costos:', error);
+    });
+}
+
+function mostrarCostoEstimado(costoTotal, costosPorEspecie) {
+    // Buscar o crear elemento para mostrar costo
+    let elementoCosto = document.getElementById('costoEstimadoTotal');
+
+    if (!elementoCosto) {
+        // Crear elemento después del área mínima
+        const contenedorAnimales = document.getElementById('infoAnimales');
+        elementoCosto = document.createElement('div');
+        elementoCosto.id = 'costoEstimadoTotal';
+        elementoCosto.className = 'alert alert-info mt-2';
+        contenedorAnimales.parentNode.insertBefore(elementoCosto, contenedorAnimales.nextSibling);
+    }
+
+    // Crear desglose de costos
+    let desglose = '';
+    for (const [especie, datos] of Object.entries(costosPorEspecie)) {
+        if (datos.cantidad_animales > 0) {
+            desglose += `<small class="d-block text-muted">
+                ${especie.charAt(0).toUpperCase() + especie.slice(1)}: 
+                ${datos.cantidad_animales} animales - 
+                ${datos.material_nombre} - 
+                $${datos.costo_total.toLocaleString('es-MX')}
+            </small>`;
+        }
+    }
+
+    elementoCosto.innerHTML = `
+        <i class="fas fa-calculator me-2"></i>
+        <strong>Costo estimado de materiales: $${costoTotal.toLocaleString('es-MX')}</strong>
+        <small class="d-block text-muted mt-1">
+            <i class="fas fa-info-circle me-1"></i>
+            Estimación inicial considerando imperfecciones prácticas. El AG optimizará la distribución.
+        </small>
+        ${desglose}
+    `;
 }
 
 function validarTerreno() {
@@ -188,8 +284,6 @@ function actualizarPesos() {
     const totalElement = document.getElementById('totalPesos');
 
     totalElement.textContent = total + '%';
-
-    // Solo mostrar color informativo, sin restricción
     totalElement.className = 'text-info fw-bold';
 }
 
@@ -224,7 +318,7 @@ function recopilarConfiguracion() {
             poblacion: parseInt(document.getElementById('tamañoPoblacion').value),
             generaciones: parseInt(document.getElementById('numeroGeneraciones').value),
             mutacion: parseFloat(document.getElementById('probabilidadMutacion').value),
-            cruza: 0.9, // Valor fijo
+            cruza: 0.9,
             tipo_cruza: document.getElementById('tipoCruza').value
         }
     };
@@ -291,6 +385,14 @@ function validarConfiguracion(config) {
         return false;
     }
 
+    // Validar que todos los materiales estén seleccionados
+    for (const [especie, cantidad] of Object.entries(config.animales)) {
+        if (cantidad > 0 && (!config.materiales[especie] || config.materiales[especie] === '')) {
+            alert(`Debe seleccionar un material para ${especie}.`);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -320,7 +422,7 @@ function iniciarSeguimientoProgreso() {
             console.error('Error obteniendo progreso:', error);
             clearInterval(intervalo);
         });
-    }, 1000); // Actualizar cada segundo
+    }, 1000);
 }
 
 function actualizarProgreso(data) {
@@ -343,15 +445,14 @@ function finalizarOptimizacion(data) {
         modal.hide();
 
         if (data.estado === 'completado') {
-            // Redirigir a resultados
             window.location.href = '/resultados';
         } else {
             alert('Error en la optimización: ' + data.mensaje);
         }
-    }, 2000); // Esperar 2 segundos para mostrar resultado final
+    }, 2000);
 }
 
-// Funciones auxiliares para mejorar UX
+// Funciones auxiliares
 function mostrarTooltip(elemento, mensaje) {
     elemento.setAttribute('title', mensaje);
     elemento.setAttribute('data-bs-toggle', 'tooltip');
@@ -373,20 +474,16 @@ function animarElemento(elemento, clase = 'fade-in') {
 
 // Configuraciones predeterminadas
 function aplicarConfiguracionRapida() {
-    // Configuración para prueba rápida
     document.getElementById('tamañoPoblacion').value = 50;
     document.getElementById('numeroGeneraciones').value = 100;
     document.getElementById('probabilidadMutacion').value = 0.2;
-
     animarElemento(document.getElementById('configAvanzada'));
 }
 
 function aplicarConfiguracionCompleta() {
-    // Configuración para optimización completa
     document.getElementById('tamañoPoblacion').value = 100;
     document.getElementById('numeroGeneraciones').value = 500;
     document.getElementById('probabilidadMutacion').value = 0.1;
-
     animarElemento(document.getElementById('configAvanzada'));
 }
 

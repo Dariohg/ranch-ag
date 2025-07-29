@@ -8,6 +8,9 @@ import math
 from src.rancho.especies import obtener_info_especie, calcular_area_minima_corral, mapear_valor_del_vector
 from src.utilidades.configuracion import configuracion_sistema
 
+# Espacio mínimo de circulación entre corrales (metros)
+ESPACIO_MINIMO_CIRCULACION = 2.0
+
 class EvaluadorFitness:
     """
     Evalúa el fitness de un individuo considerando todos los objetivos.
@@ -15,6 +18,7 @@ class EvaluadorFitness:
 
     def __init__(self, configuracion):
         self.config = configuracion
+        self.espacio_circulacion = getattr(configuracion.rancho, 'espacio_circulacion', ESPACIO_MINIMO_CIRCULACION)
 
     def calcular_fitness(self, individuo):
         """
@@ -29,9 +33,9 @@ class EvaluadorFitness:
         # Decodificar el vector a datos físicos del rancho
         rancho_fisico = self._decodificar_individuo(individuo)
 
-        # Verificar restricciones básicas
+        # Verificar restricciones básicas incluyendo espacios de circulación
         if not self._es_factible(rancho_fisico):
-            return 0.0  # Fitness muy bajo para soluciones no factibles
+            return 0.001  # Penalización fuerte por violaciones de espacio
 
         # Calcular cada objetivo
         espacio_extra = self._calcular_espacio_extra(rancho_fisico)
@@ -47,6 +51,9 @@ class EvaluadorFitness:
         manejo_norm = eficiencia_manejo  # Ya está normalizado
         terreno_norm = aprovechamiento_terreno  # Ya está normalizado
 
+        # Bonus por mantener buenos espacios de circulación
+        bonus_circulacion = self._calcular_bonus_circulacion(rancho_fisico)
+
         # Aplicar pesos de objetivos
         pesos = self.config.rancho.pesos_objetivos
         fitness = (
@@ -54,7 +61,8 @@ class EvaluadorFitness:
             pesos['costo_construccion'] * (1.0 - costo_norm) +  # Invertir porque queremos minimizar
             pesos['cantidad_materiales'] * (1.0 - materiales_norm) +  # Invertir porque queremos minimizar
             pesos['eficiencia_manejo'] * manejo_norm +
-            pesos['aprovechamiento_terreno'] * terreno_norm
+            pesos['aprovechamiento_terreno'] * terreno_norm +
+            0.05 * bonus_circulacion  # 5% bonus por buena circulación
         )
 
         return fitness
@@ -119,7 +127,7 @@ class EvaluadorFitness:
                 ancho = math.sqrt(area_real * proporcion)
                 alto = area_real / ancho
 
-                # Encontrar posición válida sin solapamientos
+                # Encontrar posición válida sin solapamientos y con espacio de circulación
                 pos_x, pos_y = self._encontrar_posicion_valida(
                     data['posicion_x'], data['posicion_y'],
                     ancho, alto, corrales_fisicos
@@ -162,27 +170,27 @@ class EvaluadorFitness:
 
     def _encontrar_posicion_valida(self, pos_x_norm, pos_y_norm, ancho, alto, corrales_existentes):
         """
-        Encuentra una posición válida para un corral sin solapamientos.
+        Encuentra una posición válida para un corral sin solapamientos y con espacio de circulación.
         """
         # Verificar peso de aprovechamiento del terreno
         peso_terreno = self.config.rancho.pesos_objetivos.get('aprovechamiento_terreno', 0.1)
 
-        # Si el aprovechamiento del terreno tiene peso alto, ser menos conservador con las distancias
-        if peso_terreno > 0.3:  # Más del 30% de peso
-            margen_reducido = 1.0  # Reducir margen de separación
+        # Siempre mantener espacio mínimo de circulación
+        if peso_terreno > 0.3:
+            margen_circulacion = max(self.espacio_circulacion, 1.8)  # Mínimo 1.8m incluso con peso alto
         else:
-            margen_reducido = 1.5  # Margen normal
+            margen_circulacion = self.espacio_circulacion  # 2.0m normal
 
         # Posición inicial deseada
         pos_x_inicial = pos_x_norm * max(0, self.config.rancho.ancho_terreno - ancho)
         pos_y_inicial = pos_y_norm * max(0, self.config.rancho.largo_terreno - alto)
 
         # Verificar si la posición inicial es válida
-        if self._posicion_es_valida(pos_x_inicial, pos_y_inicial, ancho, alto, corrales_existentes, margen_reducido):
+        if self._posicion_es_valida(pos_x_inicial, pos_y_inicial, ancho, alto, corrales_existentes, margen_circulacion):
             return pos_x_inicial, pos_y_inicial
 
         # Buscar posición alternativa en espiral
-        max_intentos = 150 if peso_terreno > 0.3 else 100
+        max_intentos = 200
         radio = 0.5
 
         for intento in range(max_intentos):
@@ -193,23 +201,30 @@ class EvaluadorFitness:
             pos_x = pos_x_inicial + offset_x
             pos_y = pos_y_inicial + offset_y
 
-            # Asegurar que esté dentro del terreno
-            pos_x = max(0, min(pos_x, self.config.rancho.ancho_terreno - ancho))
-            pos_y = max(0, min(pos_y, self.config.rancho.largo_terreno - alto))
+            # Asegurar que esté dentro del terreno con margen para circulación
+            pos_x = max(margen_circulacion/2, min(pos_x, self.config.rancho.ancho_terreno - ancho - margen_circulacion/2))
+            pos_y = max(margen_circulacion/2, min(pos_y, self.config.rancho.largo_terreno - alto - margen_circulacion/2))
 
-            if self._posicion_es_valida(pos_x, pos_y, ancho, alto, corrales_existentes, margen_reducido):
+            if self._posicion_es_valida(pos_x, pos_y, ancho, alto, corrales_existentes, margen_circulacion):
                 return pos_x, pos_y
 
-            if intento % 15 == 14:  # Aumentar radio cada 15 intentos
-                radio += 0.5
+            if intento % 20 == 19:
+                radio += 0.8
 
-        # Si no se encuentra posición, usar la inicial (el fitness será penalizado)
+        # Si no se encuentra posición válida, usar posición inicial (será penalizada)
         return pos_x_inicial, pos_y_inicial
 
-    def _posicion_es_valida(self, x, y, ancho, alto, corrales_existentes, margen_minimo=1.5):
+    def _posicion_es_valida(self, x, y, ancho, alto, corrales_existentes, margen_minimo):
         """
-        Verifica si una posición es válida (sin solapamientos).
+        Verifica si una posición es válida con espacio de circulación.
         """
+        # Verificar que esté completamente dentro del terreno
+        if (x < 0 or y < 0 or
+            x + ancho > self.config.rancho.ancho_terreno or
+            y + alto > self.config.rancho.largo_terreno):
+            return False
+
+        # Verificar que no haya solapamiento con corrales existentes
         for corral in corrales_existentes:
             if self._hay_solapamiento(x, y, ancho, alto,
                                     corral['x'], corral['y'],
@@ -220,7 +235,7 @@ class EvaluadorFitness:
 
     def _hay_solapamiento(self, x1, y1, w1, h1, x2, y2, w2, h2, margen):
         """
-        Verifica si dos rectángulos se solapan considerando un margen.
+        Verifica si dos rectángulos se solapan considerando un margen de circulación.
         """
         return not (x1 + w1 + margen <= x2 or
                    x2 + w2 + margen <= x1 or
@@ -292,7 +307,7 @@ class EvaluadorFitness:
 
     def _es_factible(self, rancho_fisico):
         """
-        Verifica si el rancho cumple las restricciones básicas.
+        Verifica si el rancho cumple las restricciones básicas incluyendo espacios de circulación.
 
         Args:
             rancho_fisico: Datos físicos del rancho
@@ -311,15 +326,73 @@ class EvaluadorFitness:
                 y + alto > self.config.rancho.largo_terreno):
                 return False
 
-        # Verificar que no haya solapamiento entre corrales
+        # Verificar espacios de circulación entre corrales
         especies = list(rancho_fisico['corrales'].keys())
         for i in range(len(especies)):
             for j in range(i + 1, len(especies)):
-                if self._corrales_se_solapan(rancho_fisico['corrales'][especies[i]],
-                                           rancho_fisico['corrales'][especies[j]]):
+                corral1 = rancho_fisico['corrales'][especies[i]]
+                corral2 = rancho_fisico['corrales'][especies[j]]
+
+                # Calcular distancia mínima entre corrales
+                distancia = self._calcular_distancia_entre_corrales(corral1, corral2)
+
+                # Verificar que haya espacio suficiente para circulación
+                if distancia < self.espacio_circulacion:
                     return False
 
         return True
+
+    def _calcular_distancia_entre_corrales(self, corral1, corral2):
+        """
+        Calcula la distancia mínima entre dos corrales (espacio de circulación).
+        """
+        # Coordenadas de los corrales
+        x1_min, y1_min = corral1['posicion_x'], corral1['posicion_y']
+        x1_max, y1_max = x1_min + corral1['ancho'], y1_min + corral1['alto']
+
+        x2_min, y2_min = corral2['posicion_x'], corral2['posicion_y']
+        x2_max, y2_max = x2_min + corral2['ancho'], y2_min + corral2['alto']
+
+        # Calcular distancia entre bordes más cercanos
+        dx = max(0, max(x1_min - x2_max, x2_min - x1_max))
+        dy = max(0, max(y1_min - y2_max, y2_min - y1_max))
+
+        # La distancia es la menor de las dos (horizontal o vertical)
+        if dx == 0 and dy == 0:
+            return 0  # Se solapan
+        elif dx == 0:
+            return dy  # Separados verticalmente
+        elif dy == 0:
+            return dx  # Separados horizontalmente
+        else:
+            return min(dx, dy)  # Separados diagonalmente, tomar la menor distancia
+
+    def _calcular_bonus_circulacion(self, rancho_fisico):
+        """
+        Calcula un bonus por mantener buenos espacios de circulación.
+        """
+        if len(rancho_fisico['corrales']) < 2:
+            return 1.0
+
+        distancias_circulacion = []
+        especies = list(rancho_fisico['corrales'].keys())
+
+        for i in range(len(especies)):
+            for j in range(i + 1, len(especies)):
+                corral1 = rancho_fisico['corrales'][especies[i]]
+                corral2 = rancho_fisico['corrales'][especies[j]]
+                distancia = self._calcular_distancia_entre_corrales(corral1, corral2)
+                distancias_circulacion.append(distancia)
+
+        if not distancias_circulacion:
+            return 1.0
+
+        # Calcular promedio de espacios de circulación
+        promedio_espacios = sum(distancias_circulacion) / len(distancias_circulacion)
+
+        # Normalizar: 2m = 0.0, 4m = 1.0
+        bonus = min((promedio_espacios - self.espacio_circulacion) / 2.0, 1.0)
+        return max(bonus, 0.0)
 
     def _corrales_se_solapan(self, corral1, corral2):
         """

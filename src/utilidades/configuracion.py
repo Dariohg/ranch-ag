@@ -14,6 +14,9 @@ class ConfiguracionRancho:
         self.ancho_terreno = 40.0  # metros
         self.largo_terreno = 30.0  # metros
 
+        # ESPACIOS DE CIRCULACIÓN - Configurable por usuario
+        self.espacio_circulacion = 2.0  # metros mínimos entre corrales
+
         # ANIMALES - Configurable por usuario
         self.cantidad_animales = {
             'gallinas': 50,
@@ -95,6 +98,10 @@ class ConfiguracionSistema:
             self.rancho.ancho_terreno = float(datos_web['terreno']['ancho'])
             self.rancho.largo_terreno = float(datos_web['terreno']['largo'])
 
+        # Actualizar espacios de circulación
+        if 'espacios' in datos_web and 'circulacion' in datos_web['espacios']:
+            self.rancho.espacio_circulacion = float(datos_web['espacios']['circulacion'])
+
         # Actualizar animales
         if 'animales' in datos_web:
             for especie, cantidad in datos_web['animales'].items():
@@ -131,7 +138,6 @@ class ConfiguracionSistema:
             self.algoritmo_genetico.tamano_poblacion = int(ag_datos.get('poblacion', 100))
             self.algoritmo_genetico.numero_generaciones = int(ag_datos.get('generaciones', 500))
             self.algoritmo_genetico.probabilidad_mutacion = float(ag_datos.get('mutacion', 0.1))
-            # ... otros parámetros
 
     def obtener_info_material(self, especie):
         """
@@ -176,6 +182,12 @@ class ConfiguracionSistema:
         if self.rancho.ancho_terreno <= 0 or self.rancho.largo_terreno <= 0:
             errores.append("Las dimensiones del terreno deben ser positivas")
 
+        # Validar espacios de circulación
+        if self.rancho.espacio_circulacion < 1.0:
+            errores.append("El espacio de circulación debe ser de al menos 1.0 metro")
+        elif self.rancho.espacio_circulacion > 5.0:
+            errores.append("El espacio de circulación no debería exceder 5.0 metros")
+
         # Validar animales
         for especie, cantidad in self.rancho.cantidad_animales.items():
             if cantidad < 0:
@@ -207,6 +219,26 @@ class ConfiguracionSistema:
         if self.algoritmo_genetico.numero_generaciones < 1:
             errores.append("El número de generaciones debe ser al menos 1")
 
+        # Validar que el terreno sea suficiente considerando espacios de circulación
+        if total_animales > 0:
+            area_terreno = self.rancho.ancho_terreno * self.rancho.largo_terreno
+
+            # Área mínima para animales
+            area_minima_animales = (
+                self.rancho.cantidad_animales.get('gallinas', 0) * 0.5 +
+                self.rancho.cantidad_animales.get('cerdos', 0) * 2.5 +
+                self.rancho.cantidad_animales.get('vacas', 0) * 15 +
+                self.rancho.cantidad_animales.get('cabras', 0) * 3
+            )
+
+            # Agregar estimación de espacios de circulación (40% adicional con espacios)
+            area_con_circulacion = area_minima_animales * 1.4
+
+            if area_con_circulacion > area_terreno * 0.85:
+                errores.append(f"El terreno es muy pequeño considerando los espacios de circulación requeridos. "
+                             f"Se necesitan aproximadamente {area_con_circulacion:.0f} m² "
+                             f"pero solo hay {area_terreno:.0f} m² disponibles.")
+
         return len(errores) == 0, errores
 
     def exportar_a_json(self):
@@ -221,6 +253,9 @@ class ConfiguracionSistema:
                 'terreno': {
                     'ancho': self.rancho.ancho_terreno,
                     'largo': self.rancho.largo_terreno
+                },
+                'espacios': {
+                    'circulacion': self.rancho.espacio_circulacion
                 },
                 'animales': self.rancho.cantidad_animales,
                 'materiales': self.rancho.material_por_especie,

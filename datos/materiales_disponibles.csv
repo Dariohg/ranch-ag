@@ -1,13 +1,13 @@
 material_id,nombre,costo_por_metro,durabilidad,especies_compatibles,descripcion
-malla_gallinera_economica,Malla Gallinera Económica,35,baja,gallinas,Malla hexagonal básica para aves
-malla_gallinera_estandar,Malla Gallinera Estándar,45,media,gallinas,Malla galvanizada resistente
-malla_gallinera_premium,Malla Gallinera Premium,65,alta,gallinas,Malla plastificada anti-corrosión
-cerca_alambre_basica,Cerca Alambre Básica,50,baja,cabras,Alambre de púas básico
-cerca_alambre_reforzada,Cerca Alambre Reforzada,65,media,cabras,Alambre galvanizado con tensores
-cerca_alambre_electrica,Cerca Alambre Eléctrica,85,alta,cabras,Sistema eléctrico para contención
-tubo_galvanizado_ligero,Tubo Galvanizado Ligero,75,media,cerdos,Estructura tubular para cerdos medianos
-cerca_metal_soldada,Cerca Metálica Soldada,85,alta,cerdos,Paneles soldados industriales
-cerca_metal_premium,Cerca Metálica Premium,110,muy_alta,cerdos,Sistema modular reforzado
-postes_madera_pino,Postes Madera Pino,95,media,vacas,Cerca tradicional de madera tratada
-cerca_madera_roble,Cerca Madera Roble,120,alta,vacas,Madera dura de alta resistencia
-sistema_metal_pesado,Sistema Metálico Pesado,150,muy_alta,vacas,Estructura metálica para ganado mayor
+malla_gallinera_economica,Malla Gallinera Económica,280,baja,gallinas,Malla hexagonal básica para aves
+malla_gallinera_estandar,Malla Gallinera Estándar,420,media,gallinas,Malla galvanizada resistente
+malla_gallinera_premium,Malla Gallinera Premium,680,alta,gallinas,Malla plastificada anti-corrosión
+cerca_alambre_basica,Cerca Alambre Básica,320,baja,cabras,Alambre de púas básico
+cerca_alambre_reforzada,Cerca Alambre Reforzada,480,media,cabras,Alambre galvanizado con tensores
+cerca_alambre_electrica,Cerca Alambre Eléctrica,750,alta,cabras,Sistema eléctrico para contención
+tubo_galvanizado_ligero,Tubo Galvanizado Ligero,850,media,cerdos,Estructura tubular para cerdos medianos
+cerca_metal_soldada,Cerca Metálica Soldada,1200,alta,cerdos,Paneles soldados industriales
+cerca_metal_premium,Cerca Metálica Premium,1800,muy_alta,cerdos,Sistema modular reforzado
+postes_madera_pino,Postes Madera Pino,950,media,vacas,Cerca tradicional de madera tratada
+cerca_madera_roble,Cerca Madera Roble,1400,alta,vacas,Madera dura de alta resistencia
+sistema_metal_pesado,Sistema Metálico Pesado,2200,muy_alta,vacas,Estructura metálica para ganado mayor

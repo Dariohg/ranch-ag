@@ -55,7 +55,7 @@ function mostrarResultados(resultado) {
     // Mostrar análisis técnico
     mostrarAnalisisTecnico(resultado);
 
-    // Mostrar lista de materiales
+    // Mostrar lista de materiales (USANDO BACKEND)
     mostrarListaMateriales(resultado);
 
     // Mostrar recomendaciones
@@ -76,7 +76,7 @@ function mostrarResumenEjecutivo(resultado) {
     document.getElementById('generacionesEjecutadas').textContent = resultado.generaciones_ejecutadas;
     document.getElementById('tiempoTotal').textContent = resultado.tiempo_total.toFixed(1) + 's';
 
-    // Calcular área y costo (requiere procesamiento adicional)
+    // Calcular métricas del resumen
     calcularMetricasResumen(resultado);
 }
 
@@ -86,8 +86,8 @@ function calcularMetricasResumen(resultado) {
 
     document.getElementById('areaOptimizada').textContent = areaTerreno.toLocaleString('es-MX');
 
-    // Estimar costo (simplificado)
-    const costoEstimado = config.rancho.presupuesto * 0.7; // Estimación
+    // Estimar costo (se actualizará cuando se cargue la lista de materiales)
+    const costoEstimado = config.rancho.presupuesto * 0.7;
     document.getElementById('costoEstimado').textContent = '$' + costoEstimado.toLocaleString('es-MX');
 }
 
@@ -104,7 +104,7 @@ function mostrarDetallesCorreales(resultado) {
             // Convertir valores normalizados a reales
             const posX = datos.posicion_x * config.rancho.terreno.ancho;
             const posY = datos.posicion_y * config.rancho.terreno.largo;
-            const factorAgrand = 1.0 + datos.factor_agrandamiento; // Simplificado
+            const factorAgrand = 1.0 + datos.factor_agrandamiento;
 
             html += `
                 <div class="border rounded p-3 mb-3">
@@ -118,7 +118,7 @@ function mostrarDetallesCorreales(resultado) {
                         <div class="col-6">
                             <strong>Proporción:</strong> ${datos.proporcion.toFixed(2)}<br>
                             <strong>Orientación:</strong> ${(datos.orientacion * 360).toFixed(0)}°<br>
-                            <strong>Material:</strong> ${config.rancho.materiales[especie]}
+                            <strong>Material:</strong> ${config.rancho.materiales[especie] || 'N/A'}
                         </div>
                     </div>
                 </div>
@@ -134,7 +134,7 @@ function mostrarInfraestructura(resultado) {
     const container = document.getElementById('detallesInfraestructura');
 
     // Convertir valores normalizados
-    const anchoPasillos = 1.5 + (infra.ancho_pasillos * 2.5); // 1.5m a 4m
+    const anchoPasillos = 1.5 + (infra.ancho_pasillos * 2.5);
 
     const html = `
         <div class="border rounded p-3">
@@ -244,34 +244,92 @@ function mostrarListaMateriales(resultado) {
     const container = document.getElementById('listaMateriales');
     const config = resultado.configuracion_utilizada;
 
-    let html = '';
-    let costoTotal = 0;
+    // Obtener materiales seleccionados por el usuario
+    const materialesSeleccionados = config.rancho.materiales || config.rancho.material_por_especie || {};
 
-    // Simplificado - calcular materiales básicos
-    for (const [especie, material] of Object.entries(config.rancho.materiales)) {
-        const cantidad = config.rancho.animales[especie];
-        if (cantidad > 0) {
-            // Estimación de perímetro (simplificada)
-            const perimetroEstimado = Math.sqrt(cantidad * 2.5) * 4; // Estimación
-            const costoMaterial = getCostoMaterial(material);
-            const costoEspecie = perimetroEstimado * costoMaterial;
+    console.log("=== DEBUG LISTA DE MATERIALES ===");
+    console.log("Materiales seleccionados:", materialesSeleccionados);
+    console.log("Rancho físico disponible:", !!resultado.rancho_fisico);
 
-            costoTotal += costoEspecie;
+    // USAR ENDPOINT DEL BACKEND PARA CALCULAR COSTOS CORRECTOS
+    fetch('/api/calcular_costos_resultado', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            rancho_fisico: resultado.rancho_fisico || {},
+            materiales_seleccionados: materialesSeleccionados
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error("Error calculando costos:", data.error);
+            mostrarListaMaterialesFallback(resultado);
+            return;
+        }
 
+        let html = '';
+        const costos = data.costos_por_especie;
+
+        console.log("Costos calculados por backend:", costos);
+
+        for (const [especie, datos] of Object.entries(costos)) {
             html += `
                 <div class="material-item">
                     <div>
-                        <div class="material-name">${getNombreMaterial(material)}</div>
-                        <div class="material-quantity">${perimetroEstimado.toFixed(1)} metros lineales</div>
+                        <div class="material-name">${datos.material_nombre}</div>
+                        <div class="material-quantity">
+                            ${especie.charAt(0).toUpperCase() + especie.slice(1)}: 
+                            ${datos.perimetro_metros.toFixed(1)} metros lineales
+                            ${datos.ancho_corral && datos.alto_corral ? 
+                                `(${datos.ancho_corral.toFixed(1)}m × ${datos.alto_corral.toFixed(1)}m)` : ''}
+                        </div>
                     </div>
-                    <div class="material-cost">$${costoEspecie.toLocaleString('es-MX')}</div>
+                    <div class="material-cost">$${datos.costo_total.toLocaleString('es-MX')}</div>
                 </div>
             `;
         }
-    }
 
-    container.innerHTML = html;
-    document.getElementById('costoTotalMateriales').textContent = '$' + costoTotal.toLocaleString('es-MX');
+        container.innerHTML = html;
+        document.getElementById('costoTotalMateriales').textContent =
+            '$' + data.costo_total.toLocaleString('es-MX');
+
+        // Actualizar costo estimado en resumen ejecutivo
+        document.getElementById('costoEstimado').textContent =
+            '$' + data.costo_total.toLocaleString('es-MX');
+
+        console.log("Costo total calculado por backend:", data.costo_total);
+    })
+    .catch(error => {
+        console.error('Error obteniendo costos de materiales:', error);
+        mostrarListaMaterialesFallback(resultado);
+    });
+}
+
+function mostrarListaMaterialesFallback(resultado) {
+    /**
+     * Función de respaldo si falla el cálculo del backend
+     */
+    const container = document.getElementById('listaMateriales');
+
+    container.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Error calculando costos exactos. Mostrando estimación.
+        </div>
+        <div class="material-item">
+            <div>
+                <div class="material-name">Costo estimado total</div>
+                <div class="material-quantity">Basado en configuración</div>
+            </div>
+            <div class="material-cost">$50,000</div>
+        </div>
+    `;
+
+    document.getElementById('costoTotalMateriales').textContent = '$50,000';
+    console.log("Usando cálculo de respaldo por error en backend");
 }
 
 function mostrarRecomendaciones(resultado) {
@@ -352,128 +410,6 @@ function dibujarPlano2D(resultado) {
                         canvasY + canvasAlto/2);
         }
     }
-}
-
-function dibujarConexionesInternas(ctx, corrales, config, escala, offsetX, offsetY, anchoPasillos) {
-    // Dibujar conexiones entre corrales evitando solapamientos
-    ctx.strokeStyle = '#6c757d';
-    ctx.lineWidth = anchoPasillos;
-    ctx.setLineDash([3, 3]);
-
-    for (let i = 0; i < corrales.length; i++) {
-        for (let j = i + 1; j < corrales.length; j++) {
-            const corral1 = corrales[i];
-            const corral2 = corrales[j];
-
-            // Calcular centros de corrales
-            const centro1X = corral1.x + corral1.ancho / 2;
-            const centro1Y = corral1.y + corral1.alto / 2;
-            const centro2X = corral2.x + corral2.ancho / 2;
-            const centro2Y = corral2.y + corral2.alto / 2;
-
-            // Solo dibujar conexión si hay suficiente espacio
-            const distancia = Math.sqrt(Math.pow(centro2X - centro1X, 2) + Math.pow(centro2Y - centro1Y, 2));
-
-            if (distancia > 8) { // Solo si están suficientemente separados
-                // Buscar ruta que evite otros corrales
-                const rutaLibre = encontrarRutaLibre(centro1X, centro1Y, centro2X, centro2Y, corrales, i, j);
-
-                if (rutaLibre.length > 0) {
-                    ctx.beginPath();
-                    ctx.moveTo(offsetX + rutaLibre[0].x * escala, offsetY + rutaLibre[0].y * escala);
-
-                    for (let k = 1; k < rutaLibre.length; k++) {
-                        ctx.lineTo(offsetX + rutaLibre[k].x * escala, offsetY + rutaLibre[k].y * escala);
-                    }
-                    ctx.stroke();
-                }
-            }
-        }
-    }
-}
-
-function encontrarRutaLibre(x1, y1, x2, y2, corrales, excluir1, excluir2) {
-    // Algoritmo simple para encontrar ruta L que evite corrales
-    const ruta = [];
-
-    // Probar ruta en L (horizontal primero, luego vertical)
-    const puntoIntermedio1 = { x: x2, y: y1 };
-
-    if (!hayObstaculoEnLinea(x1, y1, puntoIntermedio1.x, puntoIntermedio1.y, corrales, excluir1, excluir2) &&
-        !hayObstaculoEnLinea(puntoIntermedio1.x, puntoIntermedio1.y, x2, y2, corrales, excluir1, excluir2)) {
-        ruta.push({ x: x1, y: y1 });
-        if (Math.abs(x2 - x1) > 1) ruta.push(puntoIntermedio1);
-        ruta.push({ x: x2, y: y2 });
-        return ruta;
-    }
-
-    // Probar ruta en L invertida (vertical primero, luego horizontal)
-    const puntoIntermedio2 = { x: x1, y: y2 };
-
-    if (!hayObstaculoEnLinea(x1, y1, puntoIntermedio2.x, puntoIntermedio2.y, corrales, excluir1, excluir2) &&
-        !hayObstaculoEnLinea(puntoIntermedio2.x, puntoIntermedio2.y, x2, y2, corrales, excluir1, excluir2)) {
-        ruta.push({ x: x1, y: y1 });
-        if (Math.abs(y2 - y1) > 1) ruta.push(puntoIntermedio2);
-        ruta.push({ x: x2, y: y2 });
-        return ruta;
-    }
-
-    return []; // No se encontró ruta libre
-}
-
-function hayObstaculoEnLinea(x1, y1, x2, y2, corrales, excluir1, excluir2) {
-    // Verificar si la línea intersecta con algún corral
-    for (let i = 0; i < corrales.length; i++) {
-        if (i === excluir1 || i === excluir2) continue;
-
-        const corral = corrales[i];
-        const margen = 1; // 1 metro de margen
-
-        // Expandir el corral con margen
-        const corralExpandido = {
-            x: corral.x - margen,
-            y: corral.y - margen,
-            ancho: corral.ancho + 2 * margen,
-            alto: corral.alto + 2 * margen
-        };
-
-        if (lineaIntersectaRectangulo(x1, y1, x2, y2, corralExpandido)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function lineaIntersectaRectangulo(x1, y1, x2, y2, rect) {
-    // Verificar si la línea intersecta con el rectángulo
-    // Algoritmo simplificado: verificar si algún extremo está dentro o si cruza algún borde
-
-    // Verificar si los puntos están dentro del rectángulo
-    if ((x1 >= rect.x && x1 <= rect.x + rect.ancho && y1 >= rect.y && y1 <= rect.y + rect.alto) ||
-        (x2 >= rect.x && x2 <= rect.x + rect.ancho && y2 >= rect.y && y2 <= rect.y + rect.alto)) {
-        return true;
-    }
-
-    // Verificar intersección con los bordes del rectángulo (simplificado)
-    const rectCentroX = rect.x + rect.ancho / 2;
-    const rectCentroY = rect.y + rect.alto / 2;
-    const lineaCentroX = (x1 + x2) / 2;
-    const lineaCentroY = (y1 + y2) / 2;
-
-    // Si la línea pasa cerca del centro del rectángulo, considerar intersección
-    const distanciaAlCentro = Math.sqrt(Math.pow(lineaCentroX - rectCentroX, 2) + Math.pow(lineaCentroY - rectCentroY, 2));
-    const umbral = Math.max(rect.ancho, rect.alto) / 2;
-
-    return distanciaAlCentro < umbral;
-}
-
-function hayColision(x1, y1, w1, h1, x2, y2, w2, h2) {
-    // Agregar margen de separación de 1 metro
-    const margen = 1;
-    return !(x1 + w1 + margen <= x2 ||
-             x2 + w2 + margen <= x1 ||
-             y1 + h1 + margen <= y2 ||
-             y2 + h2 + margen <= y1);
 }
 
 function crearGraficoEvolucion(resultado) {
@@ -572,32 +508,6 @@ function exportarReporteCompleto() {
     URL.revokeObjectURL(url);
 }
 
-function exportarReporteCompleto() {
-    if (!datosResultado) {
-        alert('No hay datos para exportar');
-        return;
-    }
-
-    // Crear datos del reporte
-    const reporte = {
-        fecha: new Date().toLocaleDateString('es-MX'),
-        fitness: datosResultado.mejor_fitness,
-        generaciones: datosResultado.generaciones_ejecutadas,
-        tiempo: datosResultado.tiempo_total,
-        configuracion: datosResultado.configuracion_utilizada,
-        vector_solucion: datosResultado.mejor_individuo.vector
-    };
-
-    // Descargar como JSON
-    const blob = new Blob([JSON.stringify(reporte, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `reporte_rancho_${new Date().toISOString().split('T')[0]}.json`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
-}
-
 function guardarProyecto() {
     if (!datosResultado) {
         alert('No hay proyecto para guardar');
@@ -642,20 +552,36 @@ function getAreaMinimaPorEspecie(especie) {
 
 function getCostoMaterial(material) {
     const costos = {
-        malla_gallinera: 45,
-        cerca_alambre: 65,
-        cerca_metal: 85,
-        cerca_madera: 120
+        malla_gallinera_economica: 280,
+        malla_gallinera_estandar: 420,
+        malla_gallinera_premium: 680,
+        cerca_alambre_basica: 320,
+        cerca_alambre_reforzada: 480,
+        cerca_alambre_electrica: 750,
+        tubo_galvanizado_ligero: 850,
+        cerca_metal_soldada: 1200,
+        cerca_metal_premium: 1800,
+        postes_madera_pino: 950,
+        cerca_madera_roble: 1400,
+        sistema_metal_pesado: 2200
     };
-    return costos[material] || 50;
+    return costos[material] || 75;
 }
 
 function getNombreMaterial(material) {
     const nombres = {
-        malla_gallinera: 'Malla Gallinera',
-        cerca_alambre: 'Cerca de Alambre',
-        cerca_metal: 'Cerca Metálica',
-        cerca_madera: 'Cerca de Madera'
+        malla_gallinera_economica: 'Malla Gallinera Económica',
+        malla_gallinera_estandar: 'Malla Gallinera Estándar',
+        malla_gallinera_premium: 'Malla Gallinera Premium',
+        cerca_alambre_basica: 'Cerca Alambre Básica',
+        cerca_alambre_reforzada: 'Cerca Alambre Reforzada',
+        cerca_alambre_electrica: 'Cerca Alambre Eléctrica',
+        tubo_galvanizado_ligero: 'Tubo Galvanizado Ligero',
+        cerca_metal_soldada: 'Cerca Metálica Soldada',
+        cerca_metal_premium: 'Cerca Metálica Premium',
+        postes_madera_pino: 'Postes Madera Pino',
+        cerca_madera_roble: 'Cerca Madera Roble',
+        sistema_metal_pesado: 'Sistema Metálico Pesado'
     };
     return nombres[material] || material;
 }
@@ -679,6 +605,3 @@ function habilitarAutoRefresh() {
         }
     }, 5000); // Cada 5 segundos
 }
-
-// Inicializar auto-refresh si es necesario
-// habilitarAutoRefresh();

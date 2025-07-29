@@ -8,6 +8,7 @@ import os
 import json
 import threading
 import time
+import math
 from flask import Flask, render_template, request, jsonify, session
 
 # Agregar el directorio padre al path
@@ -15,7 +16,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.utilidades.configuracion import ConfiguracionSistema
 from src.algoritmo_genetico.poblacion import ejecutar_optimizacion
-from src.rancho.especies import obtener_especies_disponibles, obtener_info_especie
+from src.rancho.especies import (obtener_especies_disponibles, obtener_info_especie,
+                                obtener_materiales_para_especie, obtener_todos_los_materiales,
+                                obtener_info_material, calcular_costo_cerca_corral,
+                                calcular_area_minima_corral)
 
 app = Flask(__name__)
 app.secret_key = 'rancherspace_ga_secret_key_2025'
@@ -215,7 +219,6 @@ def obtener_resultado():
 def obtener_materiales_especie(especie):
     """API para obtener materiales compatibles con una especie específica."""
     try:
-        from src.rancho.especies import obtener_materiales_para_especie
         materiales = obtener_materiales_para_especie(especie)
 
         # Convertir a formato JSON
@@ -245,16 +248,16 @@ def obtener_materiales_especie(especie):
 def obtener_materiales():
     """API para obtener información de materiales disponibles."""
     try:
-        from src.rancho.especies import MATERIALES_DISPONIBLES
+        materiales = obtener_todos_los_materiales()
 
         # Convertir a formato compatible
         materiales_json = {}
-        for material_id, material_info in MATERIALES_DISPONIBLES.items():
+        for material_id, material_info in materiales.items():
             materiales_json[material_id] = {
                 'nombre': material_info.nombre,
                 'costo_por_metro': material_info.costo_por_metro,
                 'durabilidad': material_info.durabilidad,
-                'especies_recomendadas': material_info.especies_compatibles,
+                'especies_compatibles': material_info.especies_compatibles,
                 'descripcion': material_info.descripcion
             }
 
@@ -262,6 +265,151 @@ def obtener_materiales():
     except Exception as e:
         print(f"Error obteniendo materiales: {e}")
         return jsonify({})
+
+def calcular_perimetro_estimado_inicial(area):
+    """
+    Calcula el perímetro estimado inicial con factor de realismo.
+    Usa forma cuadrada + 10% por imperfecciones prácticas.
+    """
+    lado_cuadrado = math.sqrt(area)
+    perimetro_cuadrado = 4 * lado_cuadrado
+    factor_realismo = 1.10  # 10% adicional por imperfecciones
+    return perimetro_cuadrado * factor_realismo
+
+@app.route('/api/calcular_costos_estimados', methods=['POST'])
+def calcular_costos_estimados():
+    """API para calcular costos estimados basados en materiales seleccionados."""
+    try:
+        datos = request.json
+        animales = datos.get('animales', {})
+        materiales_seleccionados = datos.get('materiales', {})
+
+        costos_por_especie = {}
+        costo_total = 0
+
+        for especie, cantidad in animales.items():
+            if cantidad > 0 and especie in materiales_seleccionados:
+                # Calcular área mínima
+                area_minima = calcular_area_minima_corral(especie, cantidad)
+
+                # Calcular perímetro usando método estimado inicial
+                perimetro_estimado = calcular_perimetro_estimado_inicial(area_minima)
+
+                # Obtener costo del material seleccionado
+                material_id = materiales_seleccionados[especie]
+                try:
+                    material_info = obtener_info_material(material_id)
+                    costo_por_metro = material_info.costo_por_metro
+                    nombre_material = material_info.nombre
+                except ValueError:
+                    # Material no encontrado, usar costo por defecto
+                    costo_por_metro = 75
+                    nombre_material = f'Material para {especie}'
+
+                # Calcular costo total para esta especie
+                costo_especie = perimetro_estimado * costo_por_metro
+
+                costos_por_especie[especie] = {
+                    'cantidad_animales': cantidad,
+                    'area_estimada': area_minima,
+                    'perimetro_estimado': perimetro_estimado,
+                    'material_nombre': nombre_material,
+                    'costo_por_metro': costo_por_metro,
+                    'costo_total': costo_especie
+                }
+                costo_total += costo_especie
+
+        return jsonify({
+            'costos_por_especie': costos_por_especie,
+            'costo_total_estimado': costo_total
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def calcular_perimetro_optimizado_ag(area, factor_agrandamiento):
+    """
+    Calcula el perímetro después de optimización del AG.
+    El AG usa áreas más grandes pero optimiza la forma.
+    """
+    area_optimizada = area * factor_agrandamiento
+    lado_optimizado = math.sqrt(area_optimizada)
+    return 4 * lado_optimizado
+
+@app.route('/api/calcular_costos_resultado', methods=['POST'])
+def calcular_costos_resultado():
+    """API para calcular costos reales del resultado optimizado."""
+    try:
+        datos = request.json
+        rancho_fisico = datos.get('rancho_fisico', {})
+        materiales_seleccionados = datos.get('materiales_seleccionados', {})
+
+        costos_por_especie = {}
+        costo_total = 0
+
+        for especie, corral in rancho_fisico.get('corrales', {}).items():
+            if especie in materiales_seleccionados:
+                try:
+                    # Calcular perímetro real del corral optimizado
+                    ancho = corral.get('ancho', 0)
+                    alto = corral.get('alto', 0)
+                    perimetro_real = 2 * (ancho + alto)
+
+                    # Obtener información del material seleccionado
+                    material_id = materiales_seleccionados[especie]
+                    material_info = obtener_info_material(material_id)
+
+                    # Calcular costo real
+                    costo_especie = perimetro_real * material_info.costo_por_metro
+
+                    costos_por_especie[especie] = {
+                        'material_id': material_id,
+                        'material_nombre': material_info.nombre,
+                        'costo_por_metro': material_info.costo_por_metro,
+                        'perimetro_metros': perimetro_real,
+                        'ancho_corral': ancho,
+                        'alto_corral': alto,
+                        'area_corral': corral.get('area', 0),
+                        'costo_total': costo_especie
+                    }
+
+                    costo_total += costo_especie
+
+                except Exception as e:
+                    print(f"Error calculando costo para {especie}: {e}")
+                    # Usar valores estimados como fallback
+                    area_estimada = corral.get('area', 25)  # Area por defecto
+                    perimetro_estimado = calcular_perimetro_optimizado_ag(area_estimada, 1.4)
+
+                    try:
+                        material_info = obtener_info_material(materiales_seleccionados[especie])
+                        costo_por_metro = material_info.costo_por_metro
+                        nombre_material = material_info.nombre
+                    except:
+                        costo_por_metro = 75
+                        nombre_material = f'Material para {especie}'
+
+                    costo_especie = perimetro_estimado * costo_por_metro
+
+                    costos_por_especie[especie] = {
+                        'material_nombre': nombre_material,
+                        'costo_por_metro': costo_por_metro,
+                        'perimetro_metros': perimetro_estimado,
+                        'costo_total': costo_especie,
+                        'estimado': True,
+                        'error': str(e)
+                    }
+                    costo_total += costo_especie
+
+        return jsonify({
+            'costos_por_especie': costos_por_especie,
+            'costo_total': costo_total,
+            'moneda': 'MXN'
+        })
+
+    except Exception as e:
+        print(f"Error en calcular_costos_resultado: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/especies_info')
 def obtener_especies_info():
@@ -287,8 +435,6 @@ def calcular_areas():
     try:
         datos = request.json
         animales = datos.get('animales', {})
-
-        from src.rancho.especies import calcular_area_minima_corral
 
         areas = {}
         area_total_minima = 0
@@ -324,7 +470,6 @@ def validar_terreno():
         area_terreno = ancho * largo
 
         # Calcular área mínima requerida
-        from src.rancho.especies import calcular_area_minima_corral
         area_minima_total = 0
 
         for especie, cantidad in animales.items():
